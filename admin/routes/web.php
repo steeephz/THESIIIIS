@@ -55,6 +55,18 @@ Route::middleware(['auth:sanctum', 'web', 'admin.auth'])->prefix('admin')->group
     Route::get('/tickets', function () {
         return Inertia::render('Tickets');
     })->name('admin.tickets');
+
+    Route::get('/reports', function () {
+        return Inertia::render('Reports');
+    })->name('admin.reports');
+
+    Route::get('/payment', function () {
+        return Inertia::render('Payment');
+    })->name('admin.payment');
+
+    Route::get('/rate-management', function () {
+        return Inertia::render('RateManagement');
+    })->name('admin.rateManagement');
 });
 
 require __DIR__.'/auth.php';

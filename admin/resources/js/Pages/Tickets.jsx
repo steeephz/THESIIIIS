@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { Link } from '@inertiajs/react';
+import axios from 'axios';
 
 const initialTickets = [
   { id: 101, subject: 'No water supply', status: 'Open', created: '2025-05-20' },
@@ -52,32 +54,48 @@ const Tickets = () => {
           <img src="https://i.postimg.cc/fTdMBwmQ/hermosa-logo.png" alt="Logo" className="w-50 h-50 mx-auto mb-3" />
         </div>
         <nav className="mt-4">
-          <a href="/admin/dashboard" className="flex items-center px-6 py-3 text-base text-gray-600 hover:bg-gray-50">
+          <Link href="/admin/dashboard" className={`flex items-center px-6 py-3 text-base text-gray-600 hover:bg-gray-50 ${window.location.pathname === '/admin/dashboard' ? 'text-blue-600 bg-blue-50' : ''}`}> 
             <span className="material-symbols-outlined mr-3">dashboard</span>
             Dashboard
-          </a>
-          <a href="/admin/announcement" className="flex items-center px-6 py-3 text-base text-gray-600 hover:bg-gray-50">
+          </Link>
+          <Link href="/admin/announcement" className={`flex items-center px-6 py-3 text-base text-gray-600 hover:bg-gray-50 ${window.location.pathname === '/admin/announcement' ? 'text-blue-600 bg-blue-50' : ''}`}> 
             <span className="material-symbols-outlined mr-3">campaign</span>
             Announcement
-          </a>
-          <a href="/admin/accounts" className="flex items-center px-6 py-3 text-base text-gray-600 hover:bg-gray-50">
+          </Link>
+          <Link href="/admin/accounts" className={`flex items-center px-6 py-3 text-base text-gray-600 hover:bg-gray-50 ${window.location.pathname === '/admin/accounts' ? 'text-blue-600 bg-blue-50' : ''}`}> 
             <span className="material-symbols-outlined mr-3">manage_accounts</span>
             Manage Accounts
-          </a>
-          <a href="/admin/reports" className="flex items-center px-6 py-3 text-base text-gray-600 hover:bg-gray-50">
+          </Link>
+          <Link href="/admin/rate-management" className={`flex items-center px-6 py-3 text-base text-gray-600 hover:bg-gray-50 ${window.location.pathname === '/admin/rate-management' ? 'text-blue-600 bg-blue-50' : ''}`}> 
+            <span className="material-symbols-outlined mr-3">price_change</span>
+            Rate Management
+          </Link>
+          <Link href="/admin/payment" className={`flex items-center px-6 py-3 text-base text-gray-600 hover:bg-gray-50 ${window.location.pathname === '/admin/payment' ? 'text-blue-600 bg-blue-50' : ''}`}> 
+            <span className="material-symbols-outlined mr-3">payments</span>
+            Payment
+          </Link>
+          <Link href="/admin/reports" className={`flex items-center px-6 py-3 text-base text-gray-600 hover:bg-gray-50 ${window.location.pathname === '/admin/reports' ? 'text-blue-600 bg-blue-50' : ''}`}> 
             <span className="material-symbols-outlined mr-3">description</span>
             Reports
-          </a>
-          <a href="/admin/tickets" className="flex items-center px-6 py-3 text-base text-blue-600 bg-blue-50">
+          </Link>
+          <Link href="/admin/tickets" className={`flex items-center px-6 py-3 text-base text-blue-600 bg-blue-50 ${window.location.pathname === '/admin/tickets' ? 'text-blue-600 bg-blue-50' : ''}`}> 
             <span className="material-symbols-outlined mr-3">confirmation_number</span>
             Tickets
-          </a>
-          <a href="/admin/profile" className="flex items-center px-6 py-3 text-base text-gray-600 hover:bg-gray-50">
+          </Link>
+          <Link href="/admin/profile" className={`flex items-center px-6 py-3 text-base text-gray-600 hover:bg-gray-50 ${window.location.pathname === '/admin/profile' ? 'text-blue-600 bg-blue-50' : ''}`}> 
             <span className="material-symbols-outlined mr-3">person</span>
             Profile
-          </a>
+          </Link>
           <button
-            onClick={() => { window.location.href = '/'; }}
+            onClick={async () => {
+              try {
+                await axios.get('/sanctum/csrf-cookie');
+                await axios.post('/admin/logout');
+                window.location.href = '/';
+              } catch (error) {
+                window.location.href = '/';
+              }
+            }}
             className="flex items-center px-6 py-3 text-base text-red-600 hover:bg-red-50 w-full text-left"
           >
             <span className="material-symbols-outlined mr-3">logout</span>

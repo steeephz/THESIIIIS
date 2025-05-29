@@ -76,7 +76,7 @@ const RateManagement = () => {
                         <option value="Government">Government</option>
                     </select>
                 </div>
-                <div className="text-gray-600 text-center py-8">Rate management content goes here. (Filter: {accountType})</div>
+                <div className="text-gray-600 text-center py-8">PANG SAMGY..... (Filter: {accountType})</div>
             </div>
         </div>
     );

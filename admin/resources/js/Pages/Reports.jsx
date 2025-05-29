@@ -5,7 +5,7 @@ import axios from 'axios';
 const Reports = () => {
     const { auth } = usePage().props;
     const [profilePicture, setProfilePicture] = useState(null);
-    const [activeTab, setActiveTab] = useState('payment'); // 'payment', 'paymentReport', 'meter', 'rate'
+    const [activeTab, setActiveTab] = useState('paymentReport'); // Only 'paymentReport' or 'meter'
     const [accountType, setAccountType] = useState('All'); // Add this after other useState
 
     useEffect(() => {
@@ -132,12 +132,6 @@ const Reports = () => {
                     </div>
                     <div className="flex border-b mb-6">
                         <button
-                            className={`px-4 py-2 font-medium ${activeTab === 'payment' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600'}`}
-                            onClick={() => setActiveTab('payment')}
-                        >
-                            Payment
-                        </button>
-                        <button
                             className={`px-4 py-2 font-medium ${activeTab === 'paymentReport' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600'}`}
                             onClick={() => setActiveTab('paymentReport')}
                         >
@@ -148,12 +142,6 @@ const Reports = () => {
                             onClick={() => setActiveTab('meter')}
                         >
                             Meter Reading Report
-                        </button>
-                        <button
-                            className={`px-4 py-2 font-medium ${activeTab === 'rate' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600'}`}
-                            onClick={() => setActiveTab('rate')}
-                        >
-                            Rate Management
                         </button>
                     </div>
 
@@ -168,14 +156,6 @@ const Reports = () => {
                             Export to PDF
                         </button>
                     </div>
-
-                    {/* Payment Tab Content */}
-                    {activeTab === 'payment' && (
-                        <div>
-                            {/* Filter Dropdown is already above */}
-                            <div className="text-gray-600 text-center py-8">Payment content goes here. (Filter: {accountType})</div>
-                        </div>
-                    )}
 
                     {/* Payment Report Table */}
                     {activeTab === 'paymentReport' && (
@@ -254,14 +234,6 @@ const Reports = () => {
                                     </tr>
                                 </tbody>
                             </table>
-                        </div>
-                    )}
-
-                    {/* Rate Management Tab Content */}
-                    {activeTab === 'rate' && (
-                        <div>
-                            {/* Filter Dropdown is already above */}
-                            <div className="text-gray-600 text-center py-8">Rate management content goes here. (Filter: {accountType})</div>
                         </div>
                     )}
                 </div>

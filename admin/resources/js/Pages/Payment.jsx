@@ -76,7 +76,7 @@ const Payment = () => {
                         <option value="Government">Government</option>
                     </select>
                 </div>
-                <div className="text-gray-600 text-center py-8">Payment content goes here. (Filter: {accountType})</div>
+                <div className="text-gray-600 text-center py-8">BAYAD NG MGA HAMPAS LUPA... (Filter: {accountType})</div>
             </div>
         </div>
     );
