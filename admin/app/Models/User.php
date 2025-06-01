@@ -52,4 +52,35 @@ class User extends Authenticatable
     {
         $this->attributes['password'] = $value;
     }
+
+    public function customer()
+    {
+        return $this->hasOne(Customer::class);
+    }
+
+    public function staff()
+    {
+        return $this->hasOne(Staff::class);
+    }
+
+    public function isStaff()
+    {
+        return $this->staff !== null;
+    }
+
+    public function isCustomer()
+    {
+        return $this->customer !== null;
+    }
+
+    public function getRole()
+    {
+        if ($this->isStaff()) {
+            return $this->staff->role;
+        }
+        if ($this->isCustomer()) {
+            return 'customer';
+        }
+        return null;
+    }
 }

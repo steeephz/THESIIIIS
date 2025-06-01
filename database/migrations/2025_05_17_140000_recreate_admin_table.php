@@ -14,7 +14,7 @@ return new class extends Migration
     public function up(): void
     {
         // Create a temporary table to store existing admin data
-        Schema::create('admin_temp', function (Blueprint $table) {
+        Schema::create('staff_temp', function (Blueprint $table) {
             $table->id();
             $table->string('username')->unique();
             $table->string('password');
@@ -22,23 +22,23 @@ return new class extends Migration
         });
 
         // Copy existing data if old table exists
-        if (Schema::hasTable('admin')) {
-            DB::statement('INSERT INTO admin_temp (username, password) SELECT username, password FROM admin');
-            Schema::drop('admin');
+        if (Schema::hasTable('staff_tb')) {
+            DB::statement('INSERT INTO staff_temp (username, password) SELECT username, password FROM staff_tb');
+            Schema::drop('staff_tb');
         }
 
-        // Create new admin table with proper structure
-        Schema::create('admin', function (Blueprint $table) {
+        // Create new staff table with proper structure
+        Schema::create('staff_tb', function (Blueprint $table) {
             $table->id();
             $table->string('username')->unique();
             $table->string('password');
             $table->timestamps();
         });
 
-        // Insert default admin users with hashed passwords if no existing data
-        $adminCount = DB::table('admin_temp')->count();
-        if ($adminCount === 0) {
-            DB::table('admin')->insert([
+        // Insert default staff users with hashed passwords if no existing data
+        $staffCount = DB::table('staff_temp')->count();
+        if ($staffCount === 0) {
+            DB::table('staff_tb')->insert([
                 [
                     'username' => 'zayn',
                     'password' => Hash::make('2025'),
@@ -54,11 +54,11 @@ return new class extends Migration
             ]);
         } else {
             // Migrate existing users with hashed passwords
-            $admins = DB::table('admin_temp')->get();
-            foreach ($admins as $admin) {
-                DB::table('admin')->insert([
-                    'username' => $admin->username,
-                    'password' => Hash::make($admin->password), // Hash the plain text password
+            $staff = DB::table('staff_temp')->get();
+            foreach ($staff as $staffMember) {
+                DB::table('staff_tb')->insert([
+                    'username' => $staffMember->username,
+                    'password' => Hash::make($staffMember->password), // Hash the plain text password
                     'created_at' => now(),
                     'updated_at' => now()
                 ]);
@@ -66,7 +66,7 @@ return new class extends Migration
         }
 
         // Clean up
-        Schema::drop('admin_temp');
+        Schema::drop('staff_temp');
     }
 
     /**
@@ -74,6 +74,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('admin');
+        Schema::dropIfExists('staff_tb');
     }
 }; 

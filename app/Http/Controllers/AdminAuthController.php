@@ -20,24 +20,24 @@ class AdminAuthController extends Controller
         ]);
 
         try {
-            // Get admin user
-            $admin = DB::table('admin')->where('username', $request->username)->first();
+            // Get staff user
+            $staff = DB::table('staff_tb')->where('username', $request->username)->first();
             
             // Debug log
             Log::info('Login attempt', [
                 'username' => $request->username,
-                'admin_exists' => $admin ? 'yes' : 'no'
+                'staff_exists' => $staff ? 'yes' : 'no'
             ]);
 
-            if (!$admin) {
+            if (!$staff) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid credentials.'
                 ], 401);
             }
 
-            // Compare passwords directly
-            $passwordValid = $request->password === $admin->password;
+            // Verify the password using Hash::check
+            $passwordValid = Hash::check($request->password, $staff->password);
             
             // Debug log
             Log::info('Password check', [
@@ -52,12 +52,12 @@ class AdminAuthController extends Controller
                 ], 401);
             }
 
-            // Create or update user record for authentication
+            // Create or update user in users table
             $user = User::updateOrCreate(
-                ['email' => $request->username . '@admin.com'],
+                ['email' => $request->username . '@staff.com'],
                 [
                     'name' => $request->username,
-                    'password' => Hash::make($admin->password) // Hash it for the users table
+                    'password' => $staff->password // Use the already hashed password
                 ]
             );
 
@@ -66,7 +66,7 @@ class AdminAuthController extends Controller
             $request->session()->regenerate();
 
             // Create token for API authentication
-            $token = $user->createToken('admin-token')->plainTextToken;
+            $token = $user->createToken('staff-token')->plainTextToken;
 
             // Store token in session
             session(['api_token' => $token]);

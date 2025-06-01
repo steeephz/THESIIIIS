@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminProfileController;
+use App\Http\Controllers\AccountController;
 use Illuminate\Support\Facades\DB;
 
 /*
@@ -31,6 +32,13 @@ Route::middleware(['auth:sanctum', 'web'])->group(function () {
     // Admin Profile Routes
     Route::get('/admin/profile', [AdminProfileController::class, 'show']);
     Route::post('/admin/profile/update', [AdminProfileController::class, 'update']);
+
+    // Account Management Routes
+    Route::prefix('accounts')->group(function () {
+        Route::post('/staff', [AccountController::class, 'createStaffAccount']);
+        Route::post('/customer', [AccountController::class, 'createCustomerAccount']);
+        Route::get('/', [AccountController::class, 'listAccounts']);
+    });
 });
 
 // Temporary debug route
