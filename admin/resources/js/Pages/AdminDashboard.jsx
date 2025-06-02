@@ -55,6 +55,8 @@ const AdminDashboard = () => {
         monthlyData: [4000, 5000, 3000, 6000, 4500, 5500]
     });
 
+    const [searchRecent, setSearchRecent] = useState('');
+
     useEffect(() => {
         const fetchProfileData = async () => {
             try {
@@ -224,14 +226,6 @@ const AdminDashboard = () => {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
                     <h1 className="text-xl font-semibold">Dashboard</h1>
                     <div className="flex items-center w-full sm:w-auto gap-2">
-                        <div className="relative flex-1 sm:flex-none mr-3">
-                            <span className="material-symbols-outlined absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">search</span>
-                            <input
-                                type="text"
-                                placeholder="Search"
-                                className="w-full sm:w-auto pl-8 pr-3 py-1.5 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
                         <select
                             value={selectedCategory}
                             onChange={e => setSelectedCategory(e.target.value)}
@@ -334,25 +328,40 @@ const AdminDashboard = () => {
                 <div className="bg-white rounded-lg shadow overflow-hidden">
                     <div className="flex items-center justify-between p-4 border-b">
                         <h3 className="text-sm font-semibold">Recent Payments</h3>
-                        <Link href="/payments" className="text-blue-500 text-xs hover:underline">see all</Link>
+                        <div className="flex items-center gap-2">
+                            <div className="relative max-w-xs">
+                                <span className="material-symbols-outlined absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">search</span>
+                                <input
+                                    type="text"
+                                    value={searchRecent}
+                                    onChange={e => setSearchRecent(e.target.value)}
+                                    placeholder="Search recent payments by user"
+                                    className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    style={{ minWidth: 180 }}
+                                />
+                            </div>
+                            <Link href="/payments" className="text-blue-500 text-xs hover:underline ml-2">see all</Link>
+                        </div>
                     </div>
                     <div className="p-4">
-                        {filteredDashboardData.recentPayments.map((payment) => (
-                            <div key={payment.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between py-2 gap-2">
-                                <div className="flex items-center">
-                                    <img 
-                                        src={`https://ui-avatars.com/api/?name=${payment.name}&background=0D8ABC&color=fff`} 
-                                        alt={payment.name} 
-                                        className="w-8 h-8 rounded-full mr-3" 
-                                    />
-                                    <span className="text-sm">{payment.name}</span>
+                        {filteredDashboardData.recentPayments
+                            .filter(payment => payment.name.toLowerCase().includes(searchRecent.toLowerCase()))
+                            .map((payment) => (
+                                <div key={payment.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between py-2 gap-2">
+                                    <div className="flex items-center">
+                                        <img 
+                                            src={`https://ui-avatars.com/api/?name=${payment.name}&background=0D8ABC&color=fff`} 
+                                            alt={payment.name} 
+                                            className="w-8 h-8 rounded-full mr-3" 
+                                        />
+                                        <span className="text-sm">{payment.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <span className="text-sm font-semibold">₱{payment.amount.toFixed(2)}</span>
+                                        <span className="text-xs text-gray-500">{payment.time}</span>
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-4">
-                                    <span className="text-sm font-semibold">₱{payment.amount.toFixed(2)}</span>
-                                    <span className="text-xs text-gray-500">{payment.time}</span>
-                                </div>
-                            </div>
-                        ))}
+                            ))}
                     </div>
                 </div>
             </div>

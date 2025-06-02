@@ -264,7 +264,14 @@ const Accounts = () => {
                                             type="text"
                                             name="account_number"
                                             value={formData.account_number}
-                                            onChange={handleInputChange}
+                                            maxLength={8}
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            onChange={e => {
+                                                // Only allow numeric and up to 8 chars
+                                                const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 8);
+                                                setFormData(prev => ({ ...prev, account_number: val }));
+                                            }}
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                             required
                                         />

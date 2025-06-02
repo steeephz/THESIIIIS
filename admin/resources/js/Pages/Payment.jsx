@@ -2,6 +2,42 @@ import React, { useState } from 'react';
 import { Link } from '@inertiajs/react';
 import axios from 'axios';
 
+const paymentData = [
+  {
+    id: 1,
+    name: 'Liam Payne',
+    avatar: 'https://randomuser.me/api/portraits/men/11.jpg',
+    amount: 344.00,
+    status: 'Validated',
+  },
+  {
+    id: 2,
+    name: 'Carlos Sainz',
+    avatar: 'https://randomuser.me/api/portraits/men/12.jpg',
+    amount: 243.00,
+    status: 'Pending',
+  },
+  {
+    id: 3,
+    name: 'Zayn Malik',
+    avatar: 'https://randomuser.me/api/portraits/men/13.jpg',
+    amount: 268.00,
+    status: 'Validated',
+  },
+];
+
+const summaryStats = [
+  { label: 'Total Invoices', value: 168, icon: 'receipt_long', color: 'text-blue-600' },
+  { label: 'Paid', value: 83, icon: 'check_circle', color: 'text-green-600' },
+  { label: 'Unpaid', value: 85, icon: 'cancel', color: 'text-red-600' },
+];
+
+const statusColor = status => {
+  if (status === 'Validated') return 'text-green-600';
+  if (status === 'Pending') return 'text-gray-500';
+  return 'text-red-600';
+};
+
 const Payment = () => {
     const [accountType, setAccountType] = useState('All');
     return (
@@ -27,7 +63,7 @@ const Payment = () => {
                         <span className="material-symbols-outlined mr-3">price_change</span>
                         Rate Management
                     </Link>
-                    <Link href="/admin/payment" className={`flex items-center px-6 py-3 text-base text-gray-600 hover:bg-gray-50 ${window.location.pathname === '/admin/payment' ? 'text-blue-600 bg-blue-50' : ''}`}> 
+                    <Link href="/admin/payment" className={`flex items-center px-6 py-3 text-base text-blue-600 bg-blue-50 ${window.location.pathname === '/admin/payment' ? 'text-blue-600 bg-blue-50' : ''}`}> 
                         <span className="material-symbols-outlined mr-3">payments</span>
                         Payment
                     </Link>

@@ -143,6 +143,24 @@ const Reports = () => {
                         >
                             Meter Reading Report
                         </button>
+                        <button
+                            className={`px-4 py-2 font-medium ${activeTab === 'announcement' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600'}`}
+                            onClick={() => setActiveTab('announcement')}
+                        >
+                            Announcement History
+                        </button>
+                        <button
+                            className={`px-4 py-2 font-medium ${activeTab === 'reportHistory' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600'}`}
+                            onClick={() => setActiveTab('reportHistory')}
+                        >
+                            Report History
+                        </button>
+                        <button
+                            className={`px-4 py-2 font-medium ${activeTab === 'activityLogs' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600'}`}
+                            onClick={() => setActiveTab('activityLogs')}
+                        >
+                            Activity Logs
+                        </button>
                     </div>
 
                     {/* Export Buttons */}
@@ -199,42 +217,39 @@ const Reports = () => {
                                         <th className="py-2 px-4 font-semibold">Meter Reader</th>
                                         <th className="py-2 px-4 font-semibold">Reading Date</th>
                                         <th className="py-2 px-4 font-semibold">Account Number</th>
-                                        <th className="py-2 px-4 font-semibold">Previous Reading</th>
                                         <th className="py-2 px-4 font-semibold">Current Reading</th>
-                                        <th className="py-2 px-4 font-semibold">Consumption (cu.m.)</th>
-                                        <th className="py-2 px-4 font-semibold">Remarks</th>
-                                        <th className="py-2 px-4 font-semibold">Status</th>
+                                        <th className="py-2 px-4 font-semibold">Previous Reading</th>
+                                        <th className="py-2 px-4 font-semibold">Consumption</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {/* Sample data - replace with actual data */}
                                     <tr className="border-b hover:bg-blue-50">
                                         <td className="py-2 px-4">Jane Smith</td>
-                                        <td className="py-2 px-4">2024-03-20</td>
-                                        <td className="py-2 px-4">12345678</td>
-                                        <td className="py-2 px-4">100</td>
-                                        <td className="py-2 px-4">150</td>
-                                        <td className="py-2 px-4">50</td>
-                                        <td className="py-2 px-4">Normal reading</td>
-                                        <td className="py-2 px-4">
-                                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Normal</span>
-                                        </td>
-                                    </tr>
-                                    <tr className="border-b hover:bg-blue-50">
-                                        <td className="py-2 px-4">Mike Johnson</td>
-                                        <td className="py-2 px-4">2024-03-20</td>
+                                        <td className="py-2 px-4">2024-03-19</td>
                                         <td className="py-2 px-4">87654321</td>
-                                        <td className="py-2 px-4">200</td>
-                                        <td className="py-2 px-4">500</td>
-                                        <td className="py-2 px-4">300</td>
-                                        <td className="py-2 px-4">Suspected leak</td>
-                                        <td className="py-2 px-4">
-                                            <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">Abnormal</span>
-                                        </td>
+                                        <td className="py-2 px-4">120</td>
+                                        <td className="py-2 px-4">100</td>
+                                        <td className="py-2 px-4">20</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
+                    )}
+
+                    {/* Announcement History Stub */}
+                    {activeTab === 'announcement' && (
+                        <div className="text-center text-gray-600 py-12 text-lg">Announcement History content goes here...</div>
+                    )}
+
+                    {/* Report History Stub */}
+                    {activeTab === 'reportHistory' && (
+                        <div className="text-center text-gray-600 py-12 text-lg">Report History content goes here...</div>
+                    )}
+
+                    {/* Activity Logs Stub */}
+                    {activeTab === 'activityLogs' && (
+                        <div className="text-center text-gray-600 py-12 text-lg">Activity Logs content goes here...</div>
                     )}
                 </div>
             </div>

@@ -7,11 +7,17 @@ const initialAnnouncements = [
   { id: 2, title: 'Maintenance Notice', content: 'Routine maintenance will be conducted on June 1, 2025.' },
 ];
 
+const durationOptions = [
+  { label: '1 day', value: 1 },
+  { label: '1 week', value: 7 },
+  { label: '1 month', value: 30 },
+];
+
 const Announcement = () => {
   const { auth } = usePage().props;
   const [profilePicture, setProfilePicture] = useState(null);
   const [announcements, setAnnouncements] = useState(initialAnnouncements);
-  const [form, setForm] = useState({ title: '', content: '' });
+  const [form, setForm] = useState({ title: '', content: '', start_date: '', end_date: '' });
   const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
@@ -32,8 +38,21 @@ const Announcement = () => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  const validateDuration = (start, end) => {
+    if (!start || !end) return true;
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const maxEnd = new Date(startDate);
+    maxEnd.setMonth(maxEnd.getMonth() + 1);
+    return endDate <= maxEnd;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!validateDuration(form.start_date, form.end_date)) {
+      alert('End date must not be more than 1 month after start date.');
+      return;
+    }
     if (editingId) {
       setAnnouncements(announcements.map(a => a.id === editingId ? { ...a, ...form } : a));
       setEditingId(null);
@@ -43,18 +62,23 @@ const Announcement = () => {
         { id: Date.now(), ...form },
       ]);
     }
-    setForm({ title: '', content: '' });
+    setForm({ title: '', content: '', start_date: '', end_date: '' });
   };
 
   const handleEdit = (announcement) => {
-    setForm({ title: announcement.title, content: announcement.content });
+    setForm({
+      title: announcement.title,
+      content: announcement.content,
+      start_date: announcement.start_date || '',
+      end_date: announcement.end_date || '',
+    });
     setEditingId(announcement.id);
   };
 
   const handleDelete = (id) => {
     setAnnouncements(announcements.filter(a => a.id !== id));
     if (editingId === id) {
-      setForm({ title: '', content: '' });
+      setForm({ title: '', content: '', start_date: '', end_date: '' });
       setEditingId(null);
     }
   };
@@ -132,14 +156,6 @@ const Announcement = () => {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
           <h1 className="text-xl font-semibold">Announcements</h1>
           <div className="flex items-center w-full sm:w-auto gap-2">
-            <div className="relative flex-1 sm:flex-none mr-3">
-              <span className="material-symbols-outlined absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">search</span>
-              <input
-                type="text"
-                placeholder="Search"
-                className="w-full sm:w-auto pl-8 pr-3 py-1.5 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
             <Link href="/admin/profile">
               <img
                 src={profilePicture || `https://ui-avatars.com/api/?name=${auth?.user?.name || 'Admin'}&background=0D8ABC&color=fff`}
@@ -171,6 +187,30 @@ const Announcement = () => {
               rows={3}
               required
             />
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="block text-sm font-medium mb-1">Start Date</label>
+                <input
+                  type="date"
+                  name="start_date"
+                  value={form.start_date}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-sm font-medium mb-1">End Date</label>
+                <input
+                  type="date"
+                  name="end_date"
+                  value={form.end_date}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required
+                />
+              </div>
+            </div>
             <button
               type="submit"
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
@@ -180,16 +220,16 @@ const Announcement = () => {
             {editingId && (
               <button
                 type="button"
-                onClick={() => { setForm({ title: '', content: '' }); setEditingId(null); }}
+                onClick={() => { setForm({ title: '', content: '', start_date: '', end_date: '' }); setEditingId(null); }}
                 className="ml-2 bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400"
               >
                 Cancel
               </button>
             )}
           </form>
-          <ul className="space-y-4">
+          <ul className="space-y-6">
             {announcements.map(a => (
-              <li key={a.id} className="border rounded-lg p-4 flex flex-col gap-2 bg-gray-50">
+              <li key={a.id} className="border rounded-2xl p-8 flex flex-col gap-2 bg-gray-50 shadow-md">
                 <div className="flex justify-between items-center">
                   <h2 className="text-lg font-semibold text-blue-800">{a.title}</h2>
                   <div>
