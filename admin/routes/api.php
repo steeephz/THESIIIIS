@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 Route::post('/admin-login', [AdminAuthController::class, 'login']);
 Route::post('/admin-logout', [AdminAuthController::class, 'logout']);
 Route::get('/check-auth', [AdminAuthController::class, 'checkAuth'])->middleware(['auth:sanctum', 'web']);
+Route::post('/create-staff', [AdminAuthController::class, 'createStaff']);
 
 // Protected routes
 Route::middleware(['auth:sanctum', 'web'])->group(function () {
@@ -35,9 +36,11 @@ Route::middleware(['auth:sanctum', 'web'])->group(function () {
 
     // Account Management Routes
     Route::prefix('accounts')->group(function () {
-        Route::post('/staff', [AccountController::class, 'createStaffAccount']);
-        Route::post('/customer', [AccountController::class, 'createCustomerAccount']);
         Route::get('/', [AccountController::class, 'listAccounts']);
+        Route::post('/staff', [AccountController::class, 'createStaffAccount']);
+        Route::put('/staff/{id}', [AccountController::class, 'updateStaff']);
+        Route::delete('/staff/{id}', [AccountController::class, 'deleteStaff']);
+        Route::post('/customer', [AccountController::class, 'createCustomerAccount']);
     });
 });
 

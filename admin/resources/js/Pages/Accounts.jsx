@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import axios from 'axios';
+import Notification from '@/Components/Notification';
+import ConfirmDialog from '@/Components/ConfirmDialog';
+import AdminLayout from '@/Layouts/AdminLayout';
 
 const iconStyle = {
     cursor: 'pointer',
@@ -15,16 +18,24 @@ const Accounts = () => {
     const [showForm, setShowForm] = useState(false);
     const [formType, setFormType] = useState('staff');
     const [formData, setFormData] = useState({
+        name: '',
         username: '',
         password: '',
         role: 'admin',
         address: '',
         contact_number: '',
-        email: '',
-        employee_id: ''
+        email: ''
     });
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState('all');
+    const [editingAccount, setEditingAccount] = useState(null);
+    const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
+    const [confirmDialog, setConfirmDialog] = useState({
+        isOpen: false,
+        accountId: null,
+        type: 'delete'
+    });
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
     useEffect(() => {
         const fetchProfileData = async () => {
@@ -43,9 +54,13 @@ const Accounts = () => {
 
     const fetchAccounts = async () => {
         try {
+            console.log('Fetching accounts with type:', activeTab);
             const response = await axios.get(`/api/accounts?type=${activeTab}&search=${searchTerm}`);
+            console.log('API Response:', response.data);
+            
             if (response.data.success) {
                 setAccounts(response.data.data.data);
+                console.log('Updated accounts state:', response.data.data.data);
             }
         } catch (error) {
             console.error('Error fetching accounts:', error);
@@ -60,40 +75,79 @@ const Accounts = () => {
         }));
     };
 
+    const showNotification = (message, type = 'success') => {
+        setNotification({ show: true, message, type });
+    };
+
+    const handleEdit = (account) => {
+        setEditingAccount(account);
+        setFormData({
+            name: account.name,
+            username: account.username,
+            password: '', // Empty for edit
+            role: account.role,
+            address: account.address,
+            contact_number: account.contact_number,
+            email: account.email
+        });
+        setShowForm(true);
+    };
+
+    const handleConfirmAction = async () => {
+        try {
+            const response = await axios.delete(`/api/accounts/staff/${confirmDialog.accountId}`);
+            if (response.data.success) {
+                showNotification('Account deleted successfully');
+                fetchAccounts();
+            }
+        } catch (error) {
+            console.error('Error deleting account:', error);
+            showNotification(error.response?.data?.message || 'Error deleting account', 'error');
+        }
+        setConfirmDialog({ isOpen: false, accountId: null, type: 'delete' });
+    };
+
+    const handleCancelAction = () => {
+        setConfirmDialog({ isOpen: false, accountId: null, type: 'delete' });
+    };
+
+    const handleDelete = async (id) => {
+        setConfirmDialog({
+            isOpen: true,
+            accountId: id,
+            type: 'delete'
+        });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const endpoint = formType === 'staff' ? '/api/accounts/staff' : '/api/accounts/customer';
+            let response;
             
-            // For staff accounts, include both username and name fields
-            const dataToSubmit = formType === 'staff' 
-                ? { ...formData, name: formData.username } // Use username as name for staff
-                : formData;
-            
-            const response = await axios.post(endpoint, dataToSubmit);
+            if (editingAccount) {
+                response = await axios.put(`/api/accounts/staff/${editingAccount.id}`, formData);
+            } else {
+                response = await axios.post('/api/accounts/staff', formData);
+            }
             
             if (response.data.success) {
-                // Reset form and close modal
                 setShowForm(false);
+                setEditingAccount(null);
                 setFormData({
+                    name: '',
                     username: '',
                     password: '',
                     role: 'admin',
                     address: '',
                     contact_number: '',
-                    email: '',
-                    employee_id: ''
+                    email: ''
                 });
-                
-                // Refresh the accounts list
                 fetchAccounts();
-                
-                // Show success message
-                alert('Account created successfully!');
+                showNotification(editingAccount ? 'Account updated successfully!' : 'Account created successfully!');
             }
         } catch (error) {
-            console.error('Error creating account:', error);
-            alert(error.response?.data?.message || 'Error creating account. Please try again.');
+            console.error('Error saving account:', error);
+            showNotification(error.response?.data?.message || 'Error saving account', 'error');
         }
     };
 
@@ -115,9 +169,15 @@ const Accounts = () => {
                 <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-semibold">
-                            Create {formType === 'staff' ? 'Staff' : 'Customer'} Account
+                            {editingAccount ? 'Edit Staff Account' : 'Create Staff Account'}
                         </h2>
-                        <button onClick={() => setShowForm(false)} className="text-gray-500 hover:text-gray-700">
+                        <button 
+                            onClick={() => {
+                                setShowForm(false);
+                                setEditingAccount(null);
+                            }} 
+                            className="text-gray-500 hover:text-gray-700"
+                        >
                             <span className="material-symbols-outlined">close</span>
                         </button>
                     </div>
@@ -127,33 +187,22 @@ const Accounts = () => {
                             {formType === 'staff' ? (
                                 <>
                                     <div>
+                                        <label className="block text-sm font-medium text-gray-700">Name</label>
+                                        <input
+                                            type="text"
+                                            name="name"
+                                            value={formData.name}
+                                            onChange={handleInputChange}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
                                         <label className="block text-sm font-medium text-gray-700">Username</label>
                                         <input
                                             type="text"
                                             name="username"
                                             value={formData.username}
-                                            onChange={handleInputChange}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Employee ID</label>
-                                        <input
-                                            type="text"
-                                            name="employee_id"
-                                            value={formData.employee_id}
-                                            onChange={handleInputChange}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Email</label>
-                                        <input
-                                            type="email"
-                                            name="email"
-                                            value={formData.email}
                                             onChange={handleInputChange}
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                             required
@@ -181,8 +230,8 @@ const Accounts = () => {
                                             required
                                         >
                                             <option value="admin">Admin</option>
-                                            <option value="meter_reader">Meter Reader</option>
-                                            <option value="bill_handler">Bill Handler</option>
+                                            <option value="meter handler">Meter Handler</option>
+                                            <option value="bill handler">Bill Handler</option>
                                         </select>
                                     </div>
                                     <div>
@@ -191,6 +240,17 @@ const Accounts = () => {
                                             type="text"
                                             name="contact_number"
                                             value={formData.contact_number}
+                                            onChange={handleInputChange}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700">Email</label>
+                                        <input
+                                            type="email"
+                                            name="email"
+                                            value={formData.email}
                                             onChange={handleInputChange}
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                             required
@@ -344,202 +404,157 @@ const Accounts = () => {
 
     const filteredAccounts = accounts.filter(account => {
         if (activeTab === 'all') return true;
-        if (activeTab === 'customer') return account.customer;
-        if (account.staff) {
-            return account.staff.role === activeTab;
+        if (activeTab === 'customer') return account.type === 'customer';
+        if (account.type === 'staff') {
+            return account.role === activeTab;
         }
         return false;
     });
 
+    const handleLogout = () => {
+        setShowLogoutConfirm(true);
+    };
+
+    const handleConfirmLogout = async () => {
+        try {
+            await axios.get('/sanctum/csrf-cookie');
+            await axios.post('/admin/logout');
+            window.location.href = '/';
+        } catch (error) {
+            window.location.href = '/';
+        }
+    };
+
+    const handleCancelLogout = () => {
+        setShowLogoutConfirm(false);
+    };
+
     return (
-        <div className="min-h-screen bg-[#60B5FF] font-[Poppins] overflow-x-hidden">
-            {/* Sidebar */}
-            <div className="fixed left-0 top-0 h-full w-[240px] bg-white shadow-lg transform transition-transform duration-200 lg:translate-x-0 md:translate-x-0 -translate-x-full flex flex-col">
-                <div className="p-3 flex-shrink-0">
-                    <img src="https://i.postimg.cc/fTdMBwmQ/hermosa-logo.png" alt="Logo" className="w-50 h-50 mx-auto mb-3" />
+        <AdminLayout>
+            {/* Add Account Buttons */}
+            <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        onClick={() => {
+                            setFormType('staff');
+                            setShowForm(true);
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
+                    >
+                        <span className="material-symbols-outlined mr-2">person_add</span>
+                        Add Staff
+                    </button>
+                    <button
+                        onClick={() => {
+                            setFormType('customer');
+                            setShowForm(true);
+                        }}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center"
+                    >
+                        <span className="material-symbols-outlined mr-2">person_add</span>
+                        Add Customer
+                    </button>
                 </div>
-                <nav className="flex flex-col flex-1 overflow-y-auto">
-                    <div className="flex-1 pb-4">
-                        <Link href="/admin/dashboard" className={`flex items-center px-6 py-3 text-base ${window.location.pathname === '/admin/dashboard' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                            <span className="material-symbols-outlined mr-3">dashboard</span>
-                            Dashboard
-                        </Link>
-                        <Link href="/admin/announcement" className={`flex items-center px-6 py-3 text-base ${window.location.pathname === '/admin/announcement' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                            <span className="material-symbols-outlined mr-3">campaign</span>
-                            Announcement
-                        </Link>
-                        <Link href="/admin/accounts" className={`flex items-center px-6 py-3 text-base ${window.location.pathname === '/admin/accounts' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                            <span className="material-symbols-outlined mr-3">manage_accounts</span>
-                            Manage Accounts
-                        </Link>
-                        <Link href="/admin/rate-management" className={`flex items-center px-6 py-3 text-base ${window.location.pathname === '/admin/rate-management' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                            <span className="material-symbols-outlined mr-3">price_change</span>
-                            Rate Management
-                        </Link>
-                        <Link href="/admin/payment" className={`flex items-center px-6 py-3 text-base ${window.location.pathname === '/admin/payment' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                            <span className="material-symbols-outlined mr-3">payments</span>
-                            Payment
-                        </Link>
-                        <Link href="/admin/reports" className={`flex items-center px-6 py-3 text-base ${window.location.pathname === '/admin/reports' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                            <span className="material-symbols-outlined mr-3">description</span>
-                            Reports
-                        </Link>
-                        <Link href="/admin/tickets" className={`flex items-center px-6 py-3 text-base ${window.location.pathname === '/admin/tickets' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                            <span className="material-symbols-outlined mr-3">confirmation_number</span>
-                            Tickets
-                        </Link>
-                        <Link href="/admin/profile" className={`flex items-center px-6 py-3 text-base ${window.location.pathname === '/admin/profile' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                            <span className="material-symbols-outlined mr-3">person</span>
-                            Profile
-                        </Link>
-                    </div>
-                    <div className="flex-shrink-0">
-                        <button
-                            onClick={async () => {
-                                if (window.confirm('Are you sure you want to log out?')) {
-                                    try {
-                                        await axios.get('/sanctum/csrf-cookie');
-                                        await axios.post('/admin/logout');
-                                        window.location.href = '/';
-                                    } catch (error) {
-                                        window.location.href = '/';
-                                    }
-                                }
-                            }}
-                            className="flex items-center px-6 py-3 text-base text-gray-600 hover:text-red-600 hover:bg-red-50 w-full text-left"
-                        >
-                            <span className="material-symbols-outlined mr-3">logout</span>
-                            Logout
-                        </button>
-                    </div>
-                </nav>
             </div>
 
-            {/* Mobile Header */}
-            <div className="lg:hidden fixed top-0 left-0 right-0 bg-white h-14 flex items-center justify-between px-4 z-20">
-                <button className="text-gray-600 hover:text-gray-800">
-                    <span className="material-symbols-outlined">menu</span>
-                </button>
-                <img src="https://i.postimg.cc/fTdMBwmQ/hermosa-logo.png" alt="Logo" className="h-8" />
-                <div></div>
+            {/* Tabs */}
+            <div className="bg-white rounded-xl shadow-md mb-6">
+                <div className="flex overflow-x-auto">
+                    {tabs.map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
+                                activeTab === tab.id
+                                    ? 'text-blue-600 border-b-2 border-blue-600'
+                                    : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
             </div>
 
-            {/* Main Content */}
-            <div className="lg:ml-[240px] p-3 sm:p-4 md:p-6 lg:p-6 pt-16 lg:pt-6">
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
-                    <h1 className="text-xl font-semibold">Manage Accounts</h1>
-                    <Link href="/admin/profile">
-                        <img 
-                            src={profilePicture || `https://ui-avatars.com/api/?name=${auth?.user?.name || 'Admin'}&background=0D8ABC&color=fff`}
-                            alt="Profile" 
-                            className="w-10 h-10 rounded-full cursor-pointer hover:opacity-80 transition-opacity object-cover"
-                        />
-                    </Link>
-                </div>
-
-                {/* Add Account Buttons */}
-                <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            onClick={() => {
-                                setFormType('staff');
-                                setShowForm(true);
-                            }}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
-                        >
-                            <span className="material-symbols-outlined mr-2">person_add</span>
-                            Add Staff
-                        </button>
-                        <button
-                            onClick={() => {
-                                setFormType('customer');
-                                setShowForm(true);
-                            }}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center"
-                        >
-                            <span className="material-symbols-outlined mr-2">person_add</span>
-                            Add Customer
-                        </button>
-                    </div>
-                </div>
-
-                {/* Tabs */}
-                <div className="bg-white rounded-xl shadow-md mb-6">
-                    <div className="flex overflow-x-auto">
-                        {tabs.map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
-                                    activeTab === tab.id
-                                        ? 'text-blue-600 border-b-2 border-blue-600'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                            >
-                                {tab.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Accounts Table */}
-                <div className="bg-white rounded-xl shadow-md p-6">
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full text-sm text-left">
-                            <thead>
-                                <tr className="border-b">
-                                    <th className="py-3 px-4 font-semibold">ID</th>
-                                    <th className="py-3 px-4 font-semibold">Name</th>
-                                    <th className="py-3 px-4 font-semibold">Email</th>
-                                    <th className="py-3 px-4 font-semibold">Type</th>
-                                    <th className="py-3 px-4 font-semibold">Role/Account</th>
-                                    <th className="py-3 px-4 font-semibold">Contact</th>
-                                    <th className="py-3 px-4 font-semibold">Actions</th>
+            {/* Accounts Table */}
+            <div className="bg-white rounded-xl shadow-md p-6">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm text-left">
+                        <thead>
+                            <tr className="border-b">
+                                <th className="py-3 px-4 font-semibold">ID</th>
+                                <th className="py-3 px-4 font-semibold">Name</th>
+                                <th className="py-3 px-4 font-semibold">Email</th>
+                                <th className="py-3 px-4 font-semibold">Type</th>
+                                <th className="py-3 px-4 font-semibold">Role/Account</th>
+                                <th className="py-3 px-4 font-semibold">Contact</th>
+                                <th className="py-3 px-4 font-semibold">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredAccounts.map((account) => (
+                                <tr key={account.id} className="border-b hover:bg-blue-50">
+                                    <td className="py-3 px-4">{account.id}</td>
+                                    <td className="py-3 px-4">{account.name}</td>
+                                    <td className="py-3 px-4">{account.email}</td>
+                                    <td className="py-3 px-4">
+                                        {account.type === 'staff' ? 'Staff' : 'Customer'}
+                                    </td>
+                                    <td className="py-3 px-4">
+                                        {account.type === 'staff' ? account.role : account.customer_type}
+                                    </td>
+                                    <td className="py-3 px-4">{account.contact_number}</td>
+                                    <td className="py-3 px-4">
+                                        <div className="flex items-center">
+                                            <button
+                                                onClick={() => handleEdit(account)}
+                                                className="text-blue-600 hover:text-blue-800"
+                                            >
+                                                <span className="material-symbols-outlined">edit</span>
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(account.id)}
+                                                className="text-red-600 hover:text-red-800 ml-4"
+                                            >
+                                                <span className="material-symbols-outlined">delete</span>
+                                            </button>
+                                        </div>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {filteredAccounts.map((account) => (
-                                    <tr key={account.id} className="border-b hover:bg-blue-50">
-                                        <td className="py-3 px-4">{account.id}</td>
-                                        <td className="py-3 px-4">{account.name}</td>
-                                        <td className="py-3 px-4">{account.email}</td>
-                                        <td className="py-3 px-4">
-                                            {account.staff ? 'Staff' : account.customer ? 'Customer' : 'Unknown'}
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            {account.staff ? account.staff.role : account.customer ? account.customer.customer_type : 'N/A'}
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            {account.staff ? account.staff.contact_number : account.customer ? account.customer.contact_number : 'N/A'}
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <div className="flex items-center">
-                                                <button
-                                                    onClick={() => {/* Add edit functionality */}}
-                                                    className="text-blue-600 hover:text-blue-800"
-                                                >
-                                                    <span className="material-symbols-outlined">edit</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => {/* Add delete functionality */}}
-                                                    className="text-red-600 hover:text-red-800 ml-4"
-                                                >
-                                                    <span className="material-symbols-outlined">delete</span>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
             {/* Create Account Form Modal */}
             {renderForm()}
-        </div>
+
+            {/* Add Notification component */}
+            {notification.show && (
+                <Notification
+                    message={notification.message}
+                    type={notification.type}
+                    onClose={() => setNotification({ ...notification, show: false })}
+                />
+            )}
+
+            {/* Add ConfirmDialog component */}
+            <ConfirmDialog
+                isOpen={confirmDialog.isOpen}
+                message="Are you sure you want to delete this account? This action cannot be undone."
+                onConfirm={handleConfirmAction}
+                onCancel={handleCancelAction}
+            />
+
+            {/* Add Logout Confirmation Dialog */}
+            <ConfirmDialog
+                isOpen={showLogoutConfirm}
+                message="Are you sure you want to log out?"
+                onConfirm={handleConfirmLogout}
+                onCancel={handleCancelLogout}
+            />
+        </AdminLayout>
     );
 };
 

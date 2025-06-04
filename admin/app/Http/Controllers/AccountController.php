@@ -14,58 +14,34 @@ class AccountController extends Controller
 {
     public function createStaffAccount(Request $request)
     {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'username' => 'required|string|max:255|unique:staff_tb',
+            'password' => 'required|string|min:8',
+            'role' => 'required|in:admin,meter handler,bill handler',
+            'address' => 'required|string|max:255',
+            'contact_number' => 'required|string|max:20',
+            'email' => 'required|email|max:255'
+        ]);
+
         try {
-            $request->validate([
-                'name' => 'required|string|max:255',
-                'email' => 'required|string|email|max:255|unique:users',
-                'password' => 'required|string|min:8',
-                'role' => 'required|in:admin,meter_reader,bill_handler',
-                'employee_id' => 'required|string|unique:staff',
-                'department' => 'required|string',
-                'contact_number' => 'required|string',
-                'address' => 'nullable|string',
-                'profile_picture' => 'nullable|image|mimes:jpeg,png,gif|max:2048'
-            ]);
-
-            DB::beginTransaction();
-
-            // Create user record
-            $user = User::create([
+            $staff = DB::table('staff_tb')->insert([
                 'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password)
-            ]);
-
-            // Create staff record
-            $staff = Staff::create([
-                'user_id' => $user->id,
+                'username' => $request->username,
+                'password' => Hash::make($request->password),
                 'role' => $request->role,
-                'employee_id' => $request->employee_id,
-                'department' => $request->department,
+                'address' => $request->address,
                 'contact_number' => $request->contact_number,
-                'address' => $request->address
+                'email' => $request->email,
+                'created_at' => now(),
+                'updated_at' => now()
             ]);
-
-            // Handle profile picture upload if provided
-            if ($request->hasFile('profile_picture')) {
-                $path = $request->file('profile_picture')->store('profile-pictures', 'public');
-                $staff->update(['profile_picture' => $path]);
-            }
-
-            DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Staff account created successfully',
-                'data' => [
-                    'user' => $user,
-                    'staff' => $staff
-                ]
+                'message' => 'Staff account created successfully'
             ]);
-
         } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Staff account creation failed: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create staff account: ' . $e->getMessage()
@@ -133,26 +109,50 @@ class AccountController extends Controller
             $type = $request->query('type', 'all');
             $search = $request->query('search', '');
 
-            $query = User::query();
+            Log::info('Fetching accounts', ['type' => $type, 'search' => $search]);
 
+            // Query for staff accounts
+            $query = DB::table('staff_tb');
+
+            // Add search conditions if search term exists
             if ($search) {
                 $query->where(function($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('username', 'like', "%{$search}%")
                       ->orWhere('email', 'like', "%{$search}%");
                 });
             }
 
-            if ($type === 'staff') {
-                $query->whereHas('staff');
-            } elseif ($type === 'customer') {
-                $query->whereHas('customer');
+            // Filter by role if not 'all'
+            if ($type !== 'all' && $type !== 'customer') {
+                $query->where('role', $type);
             }
 
-            $users = $query->with(['staff', 'customer'])->paginate(10);
+            // Get all staff accounts
+            $staffAccounts = $query->get();
+
+            Log::info('Staff accounts found', ['count' => $staffAccounts->count()]);
+
+            // Format the response
+            $formattedAccounts = $staffAccounts->map(function($staff) {
+                return [
+                    'id' => $staff->id,
+                    'name' => $staff->name,
+                    'username' => $staff->username,
+                    'email' => $staff->email,
+                    'role' => $staff->role,
+                    'contact_number' => $staff->contact_number,
+                    'address' => $staff->address,
+                    'type' => 'staff'
+                ];
+            });
 
             return response()->json([
                 'success' => true,
-                'data' => $users
+                'data' => [
+                    'data' => $formattedAccounts,
+                    'total' => $formattedAccounts->count()
+                ]
             ]);
 
         } catch (\Exception $e) {
@@ -160,6 +160,84 @@ class AccountController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to list accounts: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function deleteStaff($id)
+    {
+        try {
+            $staff = DB::table('staff_tb')->where('id', $id)->first();
+            
+            if (!$staff) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Staff account not found'
+                ], 404);
+            }
+
+            DB::table('staff_tb')->where('id', $id)->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Staff account deleted successfully'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Staff deletion failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete staff account: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function updateStaff(Request $request, $id)
+    {
+        try {
+            $request->validate([
+                'name' => 'required|string|max:255',
+                'username' => 'required|string|max:255|unique:staff_tb,username,' . $id,
+                'role' => 'required|in:admin,meter handler,bill handler',
+                'address' => 'required|string|max:255',
+                'contact_number' => 'required|string|max:20',
+                'email' => 'required|email|max:255'
+            ]);
+
+            $staff = DB::table('staff_tb')->where('id', $id)->first();
+            
+            if (!$staff) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Staff account not found'
+                ], 404);
+            }
+
+            DB::table('staff_tb')->where('id', $id)->update([
+                'name' => $request->name,
+                'username' => $request->username,
+                'role' => $request->role,
+                'address' => $request->address,
+                'contact_number' => $request->contact_number,
+                'email' => $request->email,
+                'updated_at' => now()
+            ]);
+
+            // If password is provided, update it
+            if ($request->filled('password')) {
+                DB::table('staff_tb')->where('id', $id)->update([
+                    'password' => Hash::make($request->password)
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Staff account updated successfully'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Staff update failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update staff account: ' . $e->getMessage()
             ], 500);
         }
     }

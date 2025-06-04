@@ -7,6 +7,7 @@ const AdminLogin = () => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [rememberMe, setRememberMe] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     // Set up CSRF token for Laravel
     useEffect(() => {
@@ -84,7 +85,7 @@ const AdminLogin = () => {
                                         lock
                                     </span>
                                     <input
-                                        type="password"
+                                        type={showPassword ? 'text' : 'password'}
                                         name="password"
                                         id="password"
                                         placeholder="••••••••"
@@ -93,6 +94,16 @@ const AdminLogin = () => {
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                     />
+                                    <button
+                                        type="button"
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        tabIndex={-1}
+                                    >
+                                        <span className="material-symbols-outlined">
+                                            {showPassword ? 'visibility_off' : 'visibility'}
+                                        </span>
+                                    </button>
                                 </div>
                             </div>
                             <div className="flex items-center justify-between">

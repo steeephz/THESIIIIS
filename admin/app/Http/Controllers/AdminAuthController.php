@@ -20,37 +20,29 @@ class AdminAuthController extends Controller
         ]);
 
         try {
-            Log::info('Login attempt details', [
-                'username' => $request->username,
-                'password_length' => strlen($request->password)
-            ]);
-
-            // Get admin user
-            $admin = DB::table('admin')->where('username', $request->username)->first();
+            // Get staff user
+            $staff = DB::table('staff_tb')->where('username', $request->username)->first();
             
-            Log::info('Admin user found', [
+            // Debug log
+            Log::info('Login attempt', [
                 'username' => $request->username,
-                'exists' => $admin ? 'yes' : 'no',
-                'admin_data' => $admin ? json_encode($admin) : null
+                'staff_exists' => $staff ? 'yes' : 'no'
             ]);
 
-            if (!$admin) {
+            if (!$staff) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid credentials.'
                 ], 401);
             }
 
-            // Compare passwords directly
-            $passwordValid = trim($request->password) === trim($admin->password);
+            // Verify the password using Hash::check
+            $passwordValid = Hash::check($request->password, $staff->password);
             
-            Log::info('Password validation', [
+            // Debug log
+            Log::info('Password check', [
                 'username' => $request->username,
-                'input_password' => $request->password,
-                'stored_password' => $admin->password,
-                'password_valid' => $passwordValid ? 'yes' : 'no',
-                'input_length' => strlen($request->password),
-                'stored_length' => strlen($admin->password)
+                'password_valid' => $passwordValid ? 'yes' : 'no'
             ]);
 
             if (!$passwordValid) {
@@ -60,55 +52,34 @@ class AdminAuthController extends Controller
                 ], 401);
             }
 
-            // Create or update user record for authentication
+            // Create or update user in users table
             $user = User::updateOrCreate(
-                ['email' => $request->username . '@admin.com'],
+                ['email' => $request->username . '@staff.com'],
                 [
                     'name' => $request->username,
-                    'password' => $admin->password
+                    'password' => $staff->password // Use the already hashed password
                 ]
             );
-
-            Log::info('User record created/updated', [
-                'username' => $request->username,
-                'user_id' => $user->id
-            ]);
 
             // Log the user in
             Auth::login($user);
             $request->session()->regenerate();
 
             // Create token for API authentication
-            $token = $user->createToken('admin-token')->plainTextToken;
+            $token = $user->createToken('staff-token')->plainTextToken;
 
             // Store token in session
             session(['api_token' => $token]);
-
-            Log::info('Login successful', [
-                'username' => $request->username,
-                'user_id' => $user->id
-            ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Login successful!',
                 'token' => $token,
-                'user' => [
-                    'username' => $admin->username,
-                    'role' => $admin->role,
-                    'email' => $admin->email,
-                    'profile_picture' => $admin->profile_picture,
-                    'address' => $admin->address,
-                    'contact_number' => $admin->contact_number
-                ]
+                'user' => $user
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Login error', [
-                'username' => $request->username,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            Log::error('Login error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'An error occurred during login.'
@@ -122,7 +93,7 @@ class AdminAuthController extends Controller
             $user = Auth::user();
             // Refresh token if needed
             if (!session('api_token')) {
-                $token = $user->createToken('admin-token')->plainTextToken;
+                $token = $user->createToken('staff-token')->plainTextToken;
                 session(['api_token' => $token]);
             }
             return response()->json([
@@ -162,6 +133,36 @@ class AdminAuthController extends Controller
                 'message' => 'Logout failed'
             ], 500);
         }
+    }
+
+    public function createStaff(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'username' => 'required|string|max:255|unique:staff_tb',
+            'password' => 'required|string|min:8',
+            'role' => 'required|in:admin,bill handler,meter handler',
+            'address' => 'required|string|max:255',
+            'contact_number' => 'required|string|max:20',
+            'email' => 'required|email|max:255'
+        ]);
+
+        $staff = DB::table('staff_tb')->insert([
+            'name' => $request->name,
+            'username' => $request->username,
+            'password' => Hash::make($request->password),
+            'role' => $request->role,
+            'address' => $request->address,
+            'contact_number' => $request->contact_number,
+            'email' => $request->email,
+            'created_at' => now(),
+            'updated_at' => now()
+        ]);
+
+        return response()->json([
+            'message' => 'Staff account created successfully',
+            'staff' => $staff
+        ], 201);
     }
 }
 
