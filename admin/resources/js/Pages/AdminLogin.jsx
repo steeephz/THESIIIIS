@@ -28,7 +28,15 @@ const AdminLogin = () => {
             });
 
             if (response.data.success) {
-                router.visit('/admin/dashboard');
+                // Check user role and redirect accordingly
+                const userRole = response.data.user.role;
+                if (userRole === 'admin') {
+                    router.visit('/admin/dashboard');
+                } else if (userRole === 'bill handler') {
+                    router.visit('/bill-handler/dashboard');
+                } else {
+                    setError('You do not have permission to access this system.');
+                }
             } else {
                 setError(response.data.message || 'Login failed. Please check your credentials.');
             }
@@ -43,12 +51,12 @@ const AdminLogin = () => {
             <div className="flex flex-col items-center justify-center px-6 py-8 mx-auto md:h-screen lg:py-0">
                 <a href="#" className="flex items-center mb-6 text-2xl font-semibold text-gray-900 dark:text-white">
                     <img className="w-8 h-8 mr-2" src="https://i.postimg.cc/fTdMBwmQ/hermosa-logo.png" alt="hermosa-logo" />
-                    <span className="font-[Poppins]">Hermosa Water District Admin</span>
+                    <span className="font-[Poppins]">Hermosa Water District</span>
                 </a>
                 <div className="w-full bg-white rounded-lg shadow dark:border md:mt-0 sm:max-w-md xl:p-0 dark:bg-gray-800 dark:border-gray-700">
                     <div className="p-6 space-y-4 md:space-y-6 sm:p-8">
                         <h1 className="text-xl font-bold leading-tight tracking-tight text-gray-900 md:text-2xl dark:text-white font-[Poppins]">
-                            Sign in to your account
+                            Sign in to your staff account
                         </h1>
                         {error && (
                             <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg dark:bg-red-200 dark:text-red-800 font-[Poppins]" role="alert">

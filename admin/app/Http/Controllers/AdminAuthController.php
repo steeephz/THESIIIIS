@@ -14,42 +14,30 @@ class AdminAuthController extends Controller
 {
     public function login(Request $request)
     {
-        $request->validate([
-            'username' => 'required|string',
-            'password' => 'required|string'
-        ]);
-
         try {
-            // Get staff user
-            $staff = DB::table('staff_tb')->where('username', $request->username)->first();
-            
-            // Debug log
-            Log::info('Login attempt', [
-                'username' => $request->username,
-                'staff_exists' => $staff ? 'yes' : 'no'
+            $request->validate([
+                'username' => 'required|string',
+                'password' => 'required|string'
             ]);
 
-            if (!$staff) {
+            // Find staff member
+            $staff = DB::table('staff_tb')
+                ->where('username', $request->username)
+                ->first();
+
+            if (!$staff || !Hash::check($request->password, $staff->password)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid credentials.'
+                    'message' => 'Invalid credentials'
                 ], 401);
             }
 
-            // Verify the password using Hash::check
-            $passwordValid = Hash::check($request->password, $staff->password);
-            
-            // Debug log
-            Log::info('Password check', [
-                'username' => $request->username,
-                'password_valid' => $passwordValid ? 'yes' : 'no'
-            ]);
-
-            if (!$passwordValid) {
+            // Check if user has allowed role
+            if (!in_array($staff->role, ['admin', 'bill handler'])) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid credentials.'
-                ], 401);
+                    'message' => 'You do not have permission to access this system'
+                ], 403);
             }
 
             // Create or update user in users table
@@ -75,7 +63,13 @@ class AdminAuthController extends Controller
                 'success' => true,
                 'message' => 'Login successful!',
                 'token' => $token,
-                'user' => $user
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $staff->name,
+                    'username' => $staff->username,
+                    'role' => $staff->role,
+                    'email' => $staff->email
+                ]
             ]);
 
         } catch (\Exception $e) {

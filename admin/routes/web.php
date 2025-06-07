@@ -69,4 +69,16 @@ Route::middleware(['auth:sanctum', 'web', 'admin.auth'])->prefix('admin')->group
     })->name('admin.rateManagement');
 });
 
+Route::middleware(['auth:sanctum', 'web'])->group(function () {
+    // Admin Dashboard
+    Route::get('/admin/dashboard', function () {
+        return Inertia::render('AdminDashboard');
+    })->name('admin.dashboard');
+
+    // Bill Handler Dashboard
+    Route::get('/bill-handler/dashboard', function () {
+        return Inertia::render('BillHandlerDashboard');
+    })->name('bill-handler.dashboard');
+});
+
 require __DIR__.'/auth.php';

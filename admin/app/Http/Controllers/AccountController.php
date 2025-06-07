@@ -111,6 +111,51 @@ class AccountController extends Controller
 
             Log::info('Fetching accounts', ['type' => $type, 'search' => $search]);
 
+            if ($type === 'customer') {
+                // Query for customer accounts
+                $query = DB::table('customers_tb');
+
+                // Add search conditions if search term exists
+                if ($search) {
+                    $query->where(function($q) use ($search) {
+                        $q->where('name', 'like', "%{$search}%")
+                          ->orWhere('username', 'like', "%{$search}%")
+                          ->orWhere('email', 'like', "%{$search}%")
+                          ->orWhere('account_number', 'like', "%{$search}%")
+                          ->orWhere('meter_number', 'like', "%{$search}%");
+                    });
+                }
+
+                // Get all customer accounts
+                $customerAccounts = $query->get();
+
+                Log::info('Customer accounts found', ['count' => $customerAccounts->count()]);
+
+                // Format the response
+                $formattedAccounts = $customerAccounts->map(function($customer) {
+                    return [
+                        'id' => $customer->id,
+                        'name' => $customer->name,
+                        'username' => $customer->username,
+                        'email' => $customer->email,
+                        'customer_type' => $customer->customer_type,
+                        'contact_number' => $customer->contact_number,
+                        'address' => $customer->address,
+                        'account_number' => $customer->account_number,
+                        'meter_number' => $customer->meter_number,
+                        'type' => 'customer'
+                    ];
+                });
+
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'data' => $formattedAccounts,
+                        'total' => $formattedAccounts->count()
+                    ]
+                ]);
+            }
+
             // Query for staff accounts
             $query = DB::table('staff_tb');
 
@@ -124,7 +169,7 @@ class AccountController extends Controller
             }
 
             // Filter by role if not 'all'
-            if ($type !== 'all' && $type !== 'customer') {
+            if ($type !== 'all') {
                 $query->where('role', $type);
             }
 
@@ -238,6 +283,142 @@ class AccountController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update staff account: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function createCustomer(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:100',
+                'email' => 'required|email|max:100|unique:customers_tb,email',
+                'password' => 'required|min:8|max:255',
+                'customer_type' => 'required|in:residential,commercial,government|max:20',
+                'account_number' => 'required|string|max:9|unique:customers_tb,account_number',
+                'meter_number' => 'required|string|max:20|unique:customers_tb,meter_number',
+                'contact_number' => 'required|string|max:15',
+                'address' => 'required|string'
+            ]);
+
+            // Hash the password
+            $validated['password'] = bcrypt($validated['password']);
+
+            // Generate username from email (everything before @)
+            $username = explode('@', $validated['email'])[0];
+            // Ensure username doesn't exceed 50 characters
+            $username = substr($username, 0, 50);
+
+            // Insert into customers_tb
+            $customer = DB::table('customers_tb')->insertGetId([
+                'name' => $validated['name'],
+                'username' => $username,
+                'password' => $validated['password'],
+                'customer_type' => $validated['customer_type'],
+                'address' => $validated['address'],
+                'contact_number' => $validated['contact_number'],
+                'email' => $validated['email'],
+                'account_number' => $validated['account_number'],
+                'meter_number' => $validated['meter_number'],
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+
+            Log::info('New customer created', ['customer_id' => $customer]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Customer created successfully',
+                'data' => ['id' => $customer]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error creating customer: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create customer: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function updateCustomer(Request $request, $id)
+    {
+        try {
+            $request->validate([
+                'name' => 'required|string|max:255',
+                'username' => 'required|string|max:255|unique:customers_tb,username,' . $id,
+                'customer_type' => 'required|in:residential,commercial,government',
+                'address' => 'required|string|max:255',
+                'contact_number' => 'required|string|max:20',
+                'email' => 'required|email|max:255|unique:customers_tb,email,' . $id,
+                'account_number' => 'required|string|max:20|unique:customers_tb,account_number,' . $id,
+                'meter_number' => 'required|string|max:20|unique:customers_tb,meter_number,' . $id
+            ]);
+
+            $customer = DB::table('customers_tb')->where('id', $id)->first();
+            
+            if (!$customer) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Customer account not found'
+                ], 404);
+            }
+
+            DB::table('customers_tb')->where('id', $id)->update([
+                'name' => $request->name,
+                'username' => $request->username,
+                'customer_type' => $request->customer_type,
+                'address' => $request->address,
+                'contact_number' => $request->contact_number,
+                'email' => $request->email,
+                'account_number' => $request->account_number,
+                'meter_number' => $request->meter_number,
+                'updated_at' => now()
+            ]);
+
+            // If password is provided, update it
+            if ($request->filled('password')) {
+                DB::table('customers_tb')->where('id', $id)->update([
+                    'password' => Hash::make($request->password)
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Customer account updated successfully'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Customer update failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update customer account: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function deleteCustomer($id)
+    {
+        try {
+            $customer = DB::table('customers_tb')->where('id', $id)->first();
+            
+            if (!$customer) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Customer account not found'
+                ], 404);
+            }
+
+            DB::table('customers_tb')->where('id', $id)->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Customer account deleted successfully'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Customer deletion failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete customer account: ' . $e->getMessage()
             ], 500);
         }
     }

@@ -6,6 +6,8 @@ use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminProfileController;
 use App\Http\Controllers\AccountController;
 use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\BillHandlerController;
+use App\Http\Controllers\CustomerController;
 
 /*
 |--------------------------------------------------------------------------
@@ -41,6 +43,16 @@ Route::middleware(['auth:sanctum', 'web'])->group(function () {
         Route::put('/staff/{id}', [AccountController::class, 'updateStaff']);
         Route::delete('/staff/{id}', [AccountController::class, 'deleteStaff']);
         Route::post('/customer', [AccountController::class, 'createCustomerAccount']);
+        Route::post('/customer', [AccountController::class, 'createCustomer']);
+        Route::put('/customer/{id}', [AccountController::class, 'updateCustomer']);
+        Route::delete('/customer/{id}', [AccountController::class, 'deleteCustomer']);
+        Route::post('/accounts/customer', [CustomerController::class, 'store']);
+    });
+
+    // Bill Handler Routes
+    Route::prefix('bill-handler')->middleware(['auth:sanctum'])->group(function () {
+        Route::get('/bill-handler-dashboard', [BillHandlerController::class, 'BillHandlerDashboard']);
+        Route::get('/customers', [BillHandlerController::class, 'getCustomers']);
     });
 });
 
