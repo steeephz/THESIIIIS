@@ -5,13 +5,14 @@ import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
+import axios from 'axios';
 
 export default function Login({ status, canResetPassword }) {
     const { data, setData, post, processing, errors, reset } = useForm({
-        email: '',
+        username: '',
         password: '',
-        remember: '',
+        remember: false,
     });
 
     useEffect(() => {
@@ -24,9 +25,17 @@ export default function Login({ status, canResetPassword }) {
         setData(event.target.name, event.target.type === 'checkbox' ? event.target.checked : event.target.value);
     };
 
-    const submit = (e) => {
+    const submit = async (e) => {
         e.preventDefault();
-        post(route('login'));
+        try {
+            const response = await axios.post('/api/admin-login', data);
+            if (response.data.success) {
+                window.location.href = '/admin/dashboard';
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            // Handle error appropriately
+        }
     };
 
     return (
@@ -37,20 +46,20 @@ export default function Login({ status, canResetPassword }) {
 
             <form onSubmit={submit}>
                 <div>
-                    <InputLabel htmlFor="email" value="Email" />
+                    <InputLabel htmlFor="username" value="Username" />
 
                     <TextInput
-                        id="email"
-                        type="email"
-                        name="email"
-                        value={data.email}
+                        id="username"
+                        type="text"
+                        name="username"
+                        value={data.username}
                         className="mt-1 block w-full"
                         autoComplete="username"
                         isFocused={true}
                         onChange={handleOnChange}
                     />
 
-                    <InputError message={errors.email} className="mt-2" />
+                    <InputError message={errors.username} className="mt-2" />
                 </div>
 
                 <div className="mt-4">
@@ -71,7 +80,7 @@ export default function Login({ status, canResetPassword }) {
 
                 <div className="block mt-4">
                     <label className="flex items-center">
-                        <Checkbox name="remember" value={data.remember} onChange={handleOnChange} />
+                        <Checkbox name="remember" checked={data.remember} onChange={handleOnChange} />
                         <span className="ml-2 text-sm text-gray-600">Remember me</span>
                     </label>
                 </div>

@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import Notification from '@/Components/Notification';
 import ConfirmDialog from '@/Components/ConfirmDialog';
 import AdminLayout from '@/Layouts/AdminLayout';
+import DynamicTitleLayout from '@/Layouts/DynamicTitleLayout';
 
 const iconStyle = {
     cursor: 'pointer',
@@ -18,6 +19,13 @@ const Accounts = () => {
     const [showForm, setShowForm] = useState(false);
     const [formType, setFormType] = useState('staff');
     const [showPassword, setShowPassword] = useState(false);
+    const [tabs] = useState([
+        { id: 'all', label: 'All Accounts' },
+        { id: 'admin', label: 'Admins' },
+        { id: 'meter handler', label: 'Meter Readers' },
+        { id: 'bill handler', label: 'Bill Handlers' },
+        { id: 'customer', label: 'Customers' }
+    ]);
     const [formData, setFormData] = useState({
         name: '',
         username: '',
@@ -41,6 +49,27 @@ const Accounts = () => {
     });
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
+    // Filter accounts based on active tab and search term
+    const filteredAccounts = useMemo(() => {
+        console.log('Current accounts:', accounts);
+        console.log('Active tab:', activeTab);
+        
+        return accounts.filter(account => {
+            console.log('Checking account:', account);
+            const matchesSearch = searchTerm === '' || 
+                account.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                account.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                account.email?.toLowerCase().includes(searchTerm.toLowerCase());
+
+            if (activeTab === 'all') return matchesSearch; // Show all accounts
+            if (activeTab === 'admin') return account.role?.toLowerCase() === 'admin' && matchesSearch;
+            if (activeTab === 'meter handler') return account.role?.toLowerCase() === 'meter handler' && matchesSearch;
+            if (activeTab === 'bill handler') return account.role?.toLowerCase() === 'bill handler' && matchesSearch;
+            if (activeTab === 'customer') return account.type?.toLowerCase() === 'customer' && matchesSearch;
+            return false;
+        });
+    }, [accounts, activeTab, searchTerm]);
+
     useEffect(() => {
         const fetchProfileData = async () => {
             try {
@@ -63,8 +92,13 @@ const Accounts = () => {
             console.log('API Response:', response.data);
             
             if (response.data.success) {
-                setAccounts(response.data.data.data);
-                console.log('Updated accounts state:', response.data.data.data);
+                // Ensure role names are consistent
+                const processedAccounts = response.data.data.data.map(account => ({
+                    ...account,
+                    role: account.role?.toLowerCase().trim()
+                }));
+                setAccounts(processedAccounts);
+                console.log('Updated accounts state:', processedAccounts);
             }
         } catch (error) {
             console.error('Error fetching accounts:', error);
@@ -249,164 +283,61 @@ const Accounts = () => {
                         </button>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 gap-6">
                             {formType === 'staff' ? (
                                 <>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700">Name</label>
+                                        <label className="block text-sm font-medium text-gray-700">
+                                            Name
+                                        </label>
                                         <input
                                             type="text"
                                             name="name"
                                             value={formData.name}
                                             onChange={handleInputChange}
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                            required
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700">Username</label>
-                                        <input
-                                            type="text"
-                                            name="username"
-                                            value={formData.username}
+                                        <label className="block text-sm font-medium text-gray-700">
+                                            Role
+                                        </label>
+                                        <select
+                                            name="role"
+                                            value={formData.role}
                                             onChange={handleInputChange}
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                            required
-                                        />
-                                    </div>
-                                    {!editingAccount && (
-                                        <>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700">Password</label>
-                                                <div className="relative">
-                                                    <input
-                                                        type={showPassword ? "text" : "password"}
-                                                        name="password"
-                                                        value={formData.password}
-                                                        onChange={handleInputChange}
-                                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                                        required
-                                                        minLength="8"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setShowPassword(!showPassword)}
-                                                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                                                    >
-                                                        <span className="material-symbols-outlined">
-                                                            {showPassword ? "visibility_off" : "visibility"}
-                                                        </span>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700">Role</label>
-                                                <select
-                                                    name="role"
-                                                    value={formData.role}
-                                                    onChange={handleInputChange}
-                                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                                    required
-                                                >
-                                                    <option value="admin">Admin</option>
-                                                    <option value="meter handler">Meter Handler</option>
-                                                    <option value="bill handler">Bill Handler</option>
-                                                </select>
-                                            </div>
-                                        </>
-                                    )}
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Contact Number</label>
-                                        <input
-                                            type="text"
-                                            name="contact_number"
-                                            value={formData.contact_number}
-                                            onChange={handleInputChange}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Email</label>
-                                        <input
-                                            type="email"
-                                            name="email"
-                                            value={formData.email}
-                                            onChange={handleInputChange}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <label className="block text-sm font-medium text-gray-700">Address</label>
-                                        <input
-                                            type="text"
-                                            name="address"
-                                            value={formData.address}
-                                            onChange={handleInputChange}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                            required
-                                        />
+                                        >
+                                            <option value="admin">Admin</option>
+                                            <option value="meter handler">Meter Reader</option>
+                                            <option value="bill handler">Bill Handler</option>
+                                        </select>
                                     </div>
                                 </>
                             ) : (
                                 <>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700">Name</label>
+                                        <label className="block text-sm font-medium text-gray-700">
+                                            Name
+                                        </label>
                                         <input
                                             type="text"
                                             name="name"
                                             value={formData.name}
                                             onChange={handleInputChange}
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                            required
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700">Email</label>
-                                        <input
-                                            type="email"
-                                            name="email"
-                                            value={formData.email}
-                                            onChange={handleInputChange}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                            required
-                                        />
-                                    </div>
-                                    {!editingAccount && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">Password</label>
-                                            <div className="relative">
-                                                <input
-                                                    type={showPassword ? "text" : "password"}
-                                                    name="password"
-                                                    value={formData.password}
-                                                    onChange={handleInputChange}
-                                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                                    required
-                                                    minLength={8}
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowPassword(!showPassword)}
-                                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                                                >
-                                                    <span className="material-symbols-outlined">
-                                                        {showPassword ? "visibility_off" : "visibility"}
-                                                    </span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Customer Type</label>
+                                        <label className="block text-sm font-medium text-gray-700">
+                                            Customer Type
+                                        </label>
                                         <select
                                             name="customer_type"
-                                            value={formData.customer_type || 'residential'}
+                                            value={formData.customer_type}
                                             onChange={handleInputChange}
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                            required
                                         >
                                             <option value="residential">Residential</option>
                                             <option value="commercial">Commercial</option>
@@ -414,56 +345,105 @@ const Accounts = () => {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700">Account Number</label>
+                                        <label className="block text-sm font-medium text-gray-700">
+                                            Account Number
+                                        </label>
                                         <input
                                             type="text"
                                             name="account_number"
                                             value={formData.account_number}
                                             onChange={handleInputChange}
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                            required
-                                            maxLength={8}
-                                            placeholder="XX-XXXXX"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700">Meter Number</label>
+                                        <label className="block text-sm font-medium text-gray-700">
+                                            Meter Number
+                                        </label>
                                         <input
                                             type="text"
                                             name="meter_number"
                                             value={formData.meter_number}
                                             onChange={handleInputChange}
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                            required
-                                            maxLength={9}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Contact Number</label>
-                                        <input
-                                            type="text"
-                                            name="contact_number"
-                                            value={formData.contact_number}
-                                            onChange={handleInputChange}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <label className="block text-sm font-medium text-gray-700">Address</label>
-                                        <input
-                                            type="text"
-                                            name="address"
-                                            value={formData.address}
-                                            onChange={handleInputChange}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                            required
                                         />
                                     </div>
                                 </>
                             )}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Username
+                                </label>
+                                <input
+                                    type="text"
+                                    name="username"
+                                    value={formData.username}
+                                    onChange={handleInputChange}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                />
+                            </div>
+                            {!editingAccount && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">
+                                        Password
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type={showPassword ? "text" : "password"}
+                                            name="password"
+                                            value={formData.password}
+                                            onChange={handleInputChange}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                                        >
+                                            <span className="material-symbols-outlined">
+                                                {showPassword ? "visibility_off" : "visibility"}
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Contact Number
+                                </label>
+                                <input
+                                    type="text"
+                                    name="contact_number"
+                                    value={formData.contact_number}
+                                    onChange={handleInputChange}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Email
+                                </label>
+                                <input
+                                    type="email"
+                                    name="email"
+                                    value={formData.email}
+                                    onChange={handleInputChange}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Address
+                                </label>
+                                <input
+                                    type="text"
+                                    name="address"
+                                    value={formData.address}
+                                    onChange={handleInputChange}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                />
+                            </div>
                         </div>
-
                         <div className="flex justify-end space-x-3 mt-6">
                             <button
                                 type="button"
@@ -485,23 +465,6 @@ const Accounts = () => {
         );
     };
 
-    const tabs = [
-        { id: 'all', label: 'All Accounts' },
-        { id: 'admin', label: 'Admins' },
-        { id: 'meter handler', label: 'Meter Handlers' },
-        { id: 'bill handler', label: 'Bill Handlers' },
-        { id: 'customer', label: 'Customers' }
-    ];
-
-    const filteredAccounts = accounts.filter(account => {
-        if (activeTab === 'all') return account.type === 'staff';
-        if (activeTab === 'customer') return account.type === 'customer';
-        if (account.type === 'staff') {
-            return account.role === activeTab;
-        }
-        return false;
-    });
-
     const handleLogout = () => {
         setShowLogoutConfirm(true);
     };
@@ -521,168 +484,186 @@ const Accounts = () => {
     };
 
     return (
-        <AdminLayout>
-            {/* Add Account Buttons */}
-            <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                <div className="flex flex-wrap gap-2">
-                    <button
-                        onClick={() => handleFormTypeChange('staff')}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
-                    >
-                        <span className="material-symbols-outlined mr-2">person_add</span>
-                        Add Staff
-                    </button>
-                    <button
-                        onClick={() => handleFormTypeChange('customer')}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center"
-                    >
-                        <span className="material-symbols-outlined mr-2">person_add</span>
-                        Add Customer
-                    </button>
-                </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="bg-white rounded-xl shadow-md mb-6">
-                <div className="flex overflow-x-auto">
-                    {tabs.map(tab => (
+        <DynamicTitleLayout userRole="admin">
+            <AdminLayout>
+                {/* Add Account Buttons */}
+                <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                    <div className="flex flex-wrap gap-2">
                         <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
-                                activeTab === tab.id
-                                    ? 'text-blue-600 border-b-2 border-blue-600'
-                                    : 'text-gray-500 hover:text-gray-700'
-                            }`}
+                            onClick={() => handleFormTypeChange('staff')}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
                         >
-                            {tab.label}
+                            <span className="material-symbols-outlined mr-2">person_add</span>
+                            Add Staff
                         </button>
-                    ))}
+                        <button
+                            onClick={() => handleFormTypeChange('customer')}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center"
+                        >
+                            <span className="material-symbols-outlined mr-2">person_add</span>
+                            Add Customer
+                        </button>
+                    </div>
                 </div>
-            </div>
 
-            {/* Accounts Table */}
-            <div className="bg-white rounded-xl shadow-md p-6">
-                <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm text-left">
-                        <thead>
-                            <tr className="border-b">
-                                {activeTab === 'customer' ? (
-                                    <>
-                                        <th className="py-3 px-4 font-semibold">Name</th>
-                                        <th className="py-3 px-4 font-semibold">Username</th>
-                                        <th className="py-3 px-4 font-semibold">Customer Type</th>
-                                        <th className="py-3 px-4 font-semibold">Address</th>
-                                        <th className="py-3 px-4 font-semibold">Contact Number</th>
-                                        <th className="py-3 px-4 font-semibold">Email</th>
-                                        <th className="py-3 px-4 font-semibold">Account Number</th>
-                                        <th className="py-3 px-4 font-semibold">Meter Number</th>
-                                        <th className="py-3 px-4 font-semibold">Actions</th>
-                                    </>
-                                ) : (
-                                    <>
-                                        <th className="py-3 px-4 font-semibold">Name</th>
-                                        <th className="py-3 px-4 font-semibold">Username</th>
-                                        <th className="py-3 px-4 font-semibold">Role</th>
-                                        <th className="py-3 px-4 font-semibold">Address</th>
-                                        <th className="py-3 px-4 font-semibold">Contact Number</th>
-                                        <th className="py-3 px-4 font-semibold">Email</th>
-                                        <th className="py-3 px-4 font-semibold">Actions</th>
-                                    </>
-                                )}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredAccounts.map((account) => (
-                                <tr key={account.id} className="border-b hover:bg-blue-50">
+                {/* Tabs */}
+                <div className="bg-white rounded-xl shadow-md mb-6">
+                    <div className="flex overflow-x-auto">
+                        {tabs.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
+                                    activeTab === tab.id
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Search Input */}
+                <div className="bg-white rounded-xl shadow-md p-4 mb-6">
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder="Search accounts..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                        <span className="material-symbols-outlined absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                            search
+                        </span>
+                    </div>
+                </div>
+
+                {/* Accounts Table */}
+                <div className="bg-white rounded-xl shadow-md p-6">
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm text-left">
+                            <thead>
+                                <tr>
                                     {activeTab === 'customer' ? (
                                         <>
-                                            <td className="py-3 px-4">{account.name}</td>
-                                            <td className="py-3 px-4">{account.username}</td>
-                                            <td className="py-3 px-4">{account.customer_type}</td>
-                                            <td className="py-3 px-4">{account.address}</td>
-                                            <td className="py-3 px-4">{account.contact_number}</td>
-                                            <td className="py-3 px-4">{account.email}</td>
-                                            <td className="py-3 px-4">{account.account_number}</td>
-                                            <td className="py-3 px-4">{account.meter_number}</td>
-                                            <td className="py-3 px-4">
-                                                <div className="flex items-center">
-                                                    <button
-                                                        onClick={() => handleEdit(account)}
-                                                        className="text-blue-600 hover:text-blue-800"
-                                                    >
-                                                        <span className="material-symbols-outlined">edit</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(account.id, 'customer')}
-                                                        className="text-red-600 hover:text-red-800 ml-4"
-                                                    >
-                                                        <span className="material-symbols-outlined">delete</span>
-                                                    </button>
-                                                </div>
-                                            </td>
+                                            <th className="py-3 px-4 font-semibold">Name</th>
+                                            <th className="py-3 px-4 font-semibold">Username</th>
+                                            <th className="py-3 px-4 font-semibold">Customer Type</th>
+                                            <th className="py-3 px-4 font-semibold">Address</th>
+                                            <th className="py-3 px-4 font-semibold">Contact Number</th>
+                                            <th className="py-3 px-4 font-semibold">Email</th>
+                                            <th className="py-3 px-4 font-semibold">Account Number</th>
+                                            <th className="py-3 px-4 font-semibold">Meter Number</th>
+                                            <th className="py-3 px-4 font-semibold">Actions</th>
                                         </>
                                     ) : (
                                         <>
-                                            <td className="py-3 px-4">{account.name}</td>
-                                            <td className="py-3 px-4">{account.username}</td>
-                                            <td className="py-3 px-4">{account.role}</td>
-                                            <td className="py-3 px-4">{account.address}</td>
-                                            <td className="py-3 px-4">{account.contact_number}</td>
-                                            <td className="py-3 px-4">{account.email}</td>
-                                            <td className="py-3 px-4">
-                                                <div className="flex items-center">
-                                                    <button
-                                                        onClick={() => handleEdit(account)}
-                                                        className="text-blue-600 hover:text-blue-800"
-                                                    >
-                                                        <span className="material-symbols-outlined">edit</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(account.id, 'staff')}
-                                                        className="text-red-600 hover:text-red-800 ml-4"
-                                                    >
-                                                        <span className="material-symbols-outlined">delete</span>
-                                                    </button>
-                                                </div>
-                                            </td>
+                                            <th className="py-3 px-4 font-semibold">Name</th>
+                                            <th className="py-3 px-4 font-semibold">Username</th>
+                                            <th className="py-3 px-4 font-semibold">Role</th>
+                                            <th className="py-3 px-4 font-semibold">Address</th>
+                                            <th className="py-3 px-4 font-semibold">Contact Number</th>
+                                            <th className="py-3 px-4 font-semibold">Email</th>
+                                            <th className="py-3 px-4 font-semibold">Actions</th>
                                         </>
                                     )}
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {filteredAccounts.map((account) => (
+                                    <tr key={account.id} className="border-b hover:bg-blue-50">
+                                        {activeTab === 'customer' ? (
+                                            <>
+                                                <td className="py-3 px-4">{account.name}</td>
+                                                <td className="py-3 px-4">{account.username}</td>
+                                                <td className="py-3 px-4">{account.customer_type}</td>
+                                                <td className="py-3 px-4">{account.address}</td>
+                                                <td className="py-3 px-4">{account.contact_number}</td>
+                                                <td className="py-3 px-4">{account.email}</td>
+                                                <td className="py-3 px-4">{account.account_number}</td>
+                                                <td className="py-3 px-4">{account.meter_number}</td>
+                                                <td className="py-3 px-4">
+                                                    <div className="flex items-center">
+                                                        <button
+                                                            onClick={() => handleEdit(account)}
+                                                            className="text-blue-600 hover:text-blue-800"
+                                                        >
+                                                            <span className="material-symbols-outlined">edit</span>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(account.id, 'customer')}
+                                                            className="text-red-600 hover:text-red-800 ml-4"
+                                                        >
+                                                            <span className="material-symbols-outlined">delete</span>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <td className="py-3 px-4">{account.name}</td>
+                                                <td className="py-3 px-4">{account.username}</td>
+                                                <td className="py-3 px-4">{account.role}</td>
+                                                <td className="py-3 px-4">{account.address}</td>
+                                                <td className="py-3 px-4">{account.contact_number}</td>
+                                                <td className="py-3 px-4">{account.email}</td>
+                                                <td className="py-3 px-4">
+                                                    <div className="flex items-center">
+                                                        <button
+                                                            onClick={() => handleEdit(account)}
+                                                            className="text-blue-600 hover:text-blue-800"
+                                                        >
+                                                            <span className="material-symbols-outlined">edit</span>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(account.id, 'staff')}
+                                                            className="text-red-600 hover:text-red-800 ml-4"
+                                                        >
+                                                            <span className="material-symbols-outlined">delete</span>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </>
+                                        )}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
 
-            {/* Create Account Form Modal */}
-            {renderForm()}
+                {/* Create Account Form Modal */}
+                {renderForm()}
 
-            {/* Add Notification component */}
-            {notification.show && (
-                <Notification
-                    message={notification.message}
-                    type={notification.type}
-                    onClose={() => setNotification({ ...notification, show: false })}
+                {/* Add Notification component */}
+                {notification.show && (
+                    <Notification
+                        message={notification.message}
+                        type={notification.type}
+                        onClose={() => setNotification({ ...notification, show: false })}
+                    />
+                )}
+
+                {/* Add ConfirmDialog component */}
+                <ConfirmDialog
+                    isOpen={confirmDialog.isOpen}
+                    message="Are you sure you want to delete this account? This action cannot be undone."
+                    onConfirm={handleConfirmAction}
+                    onCancel={handleCancelAction}
                 />
-            )}
 
-            {/* Add ConfirmDialog component */}
-            <ConfirmDialog
-                isOpen={confirmDialog.isOpen}
-                message="Are you sure you want to delete this account? This action cannot be undone."
-                onConfirm={handleConfirmAction}
-                onCancel={handleCancelAction}
-            />
-
-            {/* Add Logout Confirmation Dialog */}
-            <ConfirmDialog
-                isOpen={showLogoutConfirm}
-                message="Are you sure you want to log out?"
-                onConfirm={handleConfirmLogout}
-                onCancel={handleCancelLogout}
-            />
-        </AdminLayout>
+                {/* Add Logout Confirmation Dialog */}
+                <ConfirmDialog
+                    isOpen={showLogoutConfirm}
+                    message="Are you sure you want to log out?"
+                    onConfirm={handleConfirmLogout}
+                    onCancel={handleCancelLogout}
+                />
+            </AdminLayout>
+        </DynamicTitleLayout>
     );
 };
 

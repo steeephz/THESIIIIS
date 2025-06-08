@@ -1,5 +1,6 @@
 import React from 'react';
 import { Head } from '@inertiajs/react';
+import Footer from '../Components/Footer';
 
 const DynamicTitleLayout = ({ children, userRole }) => {
     const getTitle = () => {
@@ -16,7 +17,10 @@ const DynamicTitleLayout = ({ children, userRole }) => {
     return (
         <>
             <Head title={getTitle()} />
-            {children}
+            <div className="flex flex-col min-h-screen">
+                {children}
+                <Footer />
+            </div>
         </>
     );
 };

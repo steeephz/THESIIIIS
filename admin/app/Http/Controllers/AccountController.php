@@ -156,7 +156,75 @@ class AccountController extends Controller
                 ]);
             }
 
-            // Query for staff accounts
+            // For 'all' type, fetch both staff and customer accounts
+            if ($type === 'all') {
+                // Query for all staff accounts
+                $staffQuery = DB::table('staff_tb');
+                if ($search) {
+                    $staffQuery->where(function($q) use ($search) {
+                        $q->where('name', 'like', "%{$search}%")
+                          ->orWhere('username', 'like', "%{$search}%")
+                          ->orWhere('email', 'like', "%{$search}%");
+                    });
+                }
+                $staffAccounts = $staffQuery->get();
+
+                // Query for all customer accounts
+                $customerQuery = DB::table('customers_tb');
+                if ($search) {
+                    $customerQuery->where(function($q) use ($search) {
+                        $q->where('name', 'like', "%{$search}%")
+                          ->orWhere('username', 'like', "%{$search}%")
+                          ->orWhere('email', 'like', "%{$search}%")
+                          ->orWhere('account_number', 'like', "%{$search}%")
+                          ->orWhere('meter_number', 'like', "%{$search}%");
+                    });
+                }
+                $customerAccounts = $customerQuery->get();
+
+                // Format staff accounts
+                $formattedStaffAccounts = $staffAccounts->map(function($staff) {
+                    return [
+                        'id' => $staff->id,
+                        'name' => $staff->name,
+                        'username' => $staff->username,
+                        'email' => $staff->email,
+                        'role' => $staff->role,
+                        'contact_number' => $staff->contact_number,
+                        'address' => $staff->address,
+                        'type' => 'staff'
+                    ];
+                });
+
+                // Format customer accounts
+                $formattedCustomerAccounts = $customerAccounts->map(function($customer) {
+                    return [
+                        'id' => $customer->id,
+                        'name' => $customer->name,
+                        'username' => $customer->username,
+                        'email' => $customer->email,
+                        'customer_type' => $customer->customer_type,
+                        'contact_number' => $customer->contact_number,
+                        'address' => $customer->address,
+                        'account_number' => $customer->account_number,
+                        'meter_number' => $customer->meter_number,
+                        'type' => 'customer'
+                    ];
+                });
+
+                // Merge both collections
+                $allAccounts = $formattedStaffAccounts->concat($formattedCustomerAccounts);
+
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'data' => $allAccounts,
+                        'total' => $allAccounts->count()
+                    ]
+                ]);
+            }
+
+            // Query for staff accounts only
             $query = DB::table('staff_tb');
 
             // Add search conditions if search term exists
