@@ -1,0 +1,23 @@
+# Dependencies
+/node_modules
+node_modules/@next/swc-win32-x64-msvc/next-swc.win32-x64-msvc.node
+
+# Build files
+/build
+/dist
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.idea/
+.vscode/
+*.sublime-*
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db 
