@@ -107,7 +107,7 @@ const RateManagement = () => {
                 </nav>
             </div>
       <div className="lg:ml-[240px] p-3 sm:p-4 md:p-6 lg:p-6 pt-16 lg:pt-6">
-        <h1 className="text-2xl font-bold mb-8">Rate Management</h1>
+        <h1 className="text-xl font-semibold mb-8">Rate Management</h1>
         <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-md p-10">
           {/* Tabs */}
           <div className="flex border-b mb-8">
