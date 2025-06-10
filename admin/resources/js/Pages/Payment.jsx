@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from '@inertiajs/react';
 import axios from 'axios';
 import DynamicTitleLayout from '@/Layouts/DynamicTitleLayout';
@@ -41,6 +41,68 @@ const statusColor = status => {
 
 const Payment = () => {
     const [accountType, setAccountType] = useState('All');
+    const [payments, setPayments] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [filteredPayments, setFilteredPayments] = useState([]);
+
+    // Fetch all payments from the API
+    useEffect(() => {
+        fetchPayments();
+    }, []);
+
+    // Filter payments when accountType changes
+    useEffect(() => {
+        if (accountType === 'All') {
+            setFilteredPayments(payments);
+        } else {
+            const filtered = payments.filter(payment => 
+                payment.customer?.customer_type?.toLowerCase() === accountType.toLowerCase()
+            );
+            setFilteredPayments(filtered);
+        }
+    }, [accountType, payments]);
+
+    const fetchPayments = async () => {
+        try {
+            setLoading(true);
+            const response = await axios.get('/api/payments');
+            setPayments(response.data);
+            setFilteredPayments(response.data); // Initially show all payments
+        } catch (error) {
+            console.error('Error fetching payments:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleApprovePayment = async (paymentId) => {
+        try {
+            await axios.post(`/api/payments/${paymentId}/approve`);
+            // Refresh payments after approval
+            fetchPayments();
+        } catch (error) {
+            console.error('Error approving payment:', error);
+        }
+    };
+
+    const getStatusColor = (status, paymentType) => {
+        if (status === 'Approved') return 'text-green-600';
+        if (status === 'Pending') return 'text-yellow-600';
+        if (status === 'Verification_Failed') return 'text-red-600';
+        if (paymentType === 'Partial') return 'text-orange-600';
+        return 'text-gray-600';
+    };
+
+    const formatDate = (dateString) => {
+        return new Date(dateString).toLocaleDateString('en-PH', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
     return (
         <DynamicTitleLayout userRole="admin">
             <div className="min-h-screen bg-[#60B5FF] font-[Poppins] overflow-x-hidden">
@@ -106,22 +168,153 @@ const Payment = () => {
                 </div>
                 
                 <div className="lg:ml-[240px] p-3 sm:p-4 md:p-6 lg:p-6 pt-16 lg:pt-6">
-                    <h1 className="text-xl font-semibold mb-6">Payment</h1>
-                    <div className="flex items-center mb-6">
-                        <label htmlFor="accountType" className="mr-2 font-medium">Filter by Account Type:</label>
-                        <select
-                            id="accountType"
-                            value={accountType}
-                            onChange={e => setAccountType(e.target.value)}
-                            className="border border-gray-300 rounded-lg px-3 py-2 text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px]"
-                        >
-                            <option value="All">All</option>
-                            <option value="Commercial">Commercial</option>
-                            <option value="Residential">Residential</option>
-                            <option value="Government">Government</option>
-                        </select>
+                    <div className="bg-white rounded-lg shadow-lg p-6">
+                        <h1 className="text-2xl font-semibold mb-6">Payment Management</h1>
+                        
+                        {/* Filter Section */}
+                        <div className="flex items-center mb-6 bg-gray-50 p-4 rounded-lg">
+                            <label htmlFor="accountType" className="mr-2 font-medium text-gray-700">Filter by Account Type:</label>
+                            <select
+                                id="accountType"
+                                value={accountType}
+                                onChange={e => setAccountType(e.target.value)}
+                                className="border border-gray-300 rounded-lg px-3 py-2 text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px]"
+                            >
+                                <option value="All">All Accounts</option>
+                                <option value="residential">Residential</option>
+                                <option value="commercial">Commercial</option>
+                                <option value="government">Government</option>
+                            </select>
+                            <span className="ml-4 text-sm text-gray-500">
+                                Showing {filteredPayments.length} payments
+                            </span>
+                        </div>
+
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div className="bg-green-50 p-4 rounded-lg">
+                                <h3 className="text-lg font-semibold text-green-700">Total Payments</h3>
+                                <p className="text-2xl font-bold text-green-800">
+                                    ₱{filteredPayments.reduce((sum, payment) => sum + parseFloat(payment.amount), 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                </p>
+                            </div>
+                            <div className="bg-blue-50 p-4 rounded-lg">
+                                <h3 className="text-lg font-semibold text-blue-700">Pending Payments</h3>
+                                <p className="text-2xl font-bold text-blue-800">
+                                    {filteredPayments.filter(p => p.status === 'Pending').length}
+                                </p>
+                            </div>
+                            <div className="bg-orange-50 p-4 rounded-lg">
+                                <h3 className="text-lg font-semibold text-orange-700">Partial Payments</h3>
+                                <p className="text-2xl font-bold text-orange-800">
+                                    {filteredPayments.filter(p => p.payment_type === 'Partial').length}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Payments Table */}
+                        <div className="bg-white rounded-lg shadow overflow-hidden">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account Details</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {loading ? (
+                                        <tr>
+                                            <td colSpan="7" className="px-6 py-4 text-center">
+                                                <div className="flex items-center justify-center">
+                                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                                                    <span className="ml-2">Loading payments...</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ) : filteredPayments.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="7" className="px-6 py-4 text-center text-gray-500">
+                                                No payments found for {accountType === 'All' ? 'any account type' : accountType + ' accounts'}
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        filteredPayments.map((payment) => (
+                                            <tr key={payment.id} className="hover:bg-gray-50">
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="flex items-center">
+                                                        <div className="ml-4">
+                                                            <div className="text-sm font-medium text-gray-900">
+                                                                {payment.customer?.user?.name || 'N/A'}
+                                                            </div>
+                                                            <div className="text-sm text-gray-500">
+                                                                {payment.customer?.customer_type?.toUpperCase() || 'N/A'}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="text-sm text-gray-900">
+                                                        Acc#: {payment.account_number}
+                                                    </div>
+                                                    <div className="text-sm text-gray-500">
+                                                        Meter#: {payment.meter_number}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="text-sm font-medium text-gray-900">
+                                                        ₱{parseFloat(payment.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                    </div>
+                                                    {payment.remaining_balance > 0 && (
+                                                        <div className="text-xs text-red-500">
+                                                            Remaining: ₱{parseFloat(payment.remaining_balance).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                                        payment.payment_type === 'Full' 
+                                                            ? 'bg-green-100 text-green-800' 
+                                                            : 'bg-orange-100 text-orange-800'
+                                                    }`}>
+                                                        {payment.payment_type}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`text-sm ${getStatusColor(payment.status, payment.payment_type)}`}>
+                                                        {payment.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    {formatDate(payment.created_at)}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                    {payment.status === 'Pending' && (
+                                                        <button
+                                                            onClick={() => handleApprovePayment(payment.id)}
+                                                            className="text-blue-600 hover:text-blue-900 mr-2"
+                                                        >
+                                                            Approve
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => window.open(`/storage/${payment.proof_of_payment}`, '_blank')}
+                                                        className="text-gray-600 hover:text-gray-900"
+                                                    >
+                                                        View Proof
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    <div className="text-gray-600 text-center py-8">BAYAD NG MGA HAMPAS LUPA... (Filter: {accountType})</div>
                 </div>
             </div>
         </DynamicTitleLayout>

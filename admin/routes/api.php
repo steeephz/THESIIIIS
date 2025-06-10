@@ -10,6 +10,7 @@ use App\Http\Controllers\BillHandlerController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\RateController;
 use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\PaymentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -68,6 +69,13 @@ Route::middleware(['auth:sanctum', 'web'])->group(function () {
     Route::post('/announcements', [AnnouncementController::class, 'store']);
     Route::put('/announcements/{id}', [AnnouncementController::class, 'update']);
     Route::delete('/announcements/{id}', [AnnouncementController::class, 'destroy']);
+
+    // Payment Routes
+    Route::prefix('payments')->group(function () {
+        Route::get('/', [PaymentController::class, 'index']);
+        Route::post('/', [PaymentController::class, 'store']);
+        Route::post('/{id}/approve', [PaymentController::class, 'approve']);
+    });
 });
 
 // Temporary debug route
