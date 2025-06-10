@@ -8,6 +8,7 @@ use App\Http\Controllers\AccountController;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\BillHandlerController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\RateController;
 
 /*
 |--------------------------------------------------------------------------
@@ -54,6 +55,12 @@ Route::middleware(['auth:sanctum', 'web'])->group(function () {
         Route::get('/bill-handler-dashboard', [BillHandlerController::class, 'BillHandlerDashboard']);
         Route::get('/customers', [BillHandlerController::class, 'getCustomers']);
     });
+
+    // Rate Management Routes
+    Route::get('/rates', [RateController::class, 'index']);
+    Route::post('/rates', [RateController::class, 'store']);
+    Route::put('/rates/{id}', [RateController::class, 'update']);
+    Route::delete('/rates/{id}', [RateController::class, 'destroy']);
 });
 
 // Temporary debug route

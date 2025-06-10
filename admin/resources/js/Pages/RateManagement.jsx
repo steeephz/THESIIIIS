@@ -1,48 +1,111 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from '@inertiajs/react';
 import axios from 'axios';
 import DynamicTitleLayout from '@/Layouts/DynamicTitleLayout';
+import Notification from '@/Components/Notification';
 
+// Display names for customer types
 const accountTypes = ['Commercial', 'Residential', 'Government'];
-const initialRates = {
-  Commercial: [],
-  Residential: [],
-  Government: [],
+// Lowercase mapping for API calls
+const customerTypeMap = {
+  'Commercial': 'commercial',
+  'Residential': 'residential',
+  'Government': 'government'
 };
 
 const RateManagement = () => {
   const [activeTab, setActiveTab] = useState('Commercial');
-  const [rates, setRates] = useState(initialRates);
-  const [form, setForm] = useState({ min_charge: '', per_cubic: '' });
-  const [editingIndex, setEditingIndex] = useState(null);
+  const [rates, setRates] = useState([]);
+  const [form, setForm] = useState({ minimum_charge: '', rate_per_cu_m: '' });
+  const [editingId, setEditingId] = useState(null);
+  const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
+
+  // Fetch rates on component mount and when activeTab changes
+  useEffect(() => {
+    fetchRates();
+  }, [activeTab]);
+
+  // Auto-hide notification after 3 seconds
+  useEffect(() => {
+    if (notification.show) {
+      const timer = setTimeout(() => {
+        setNotification(prev => ({ ...prev, show: false }));
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [notification.show]);
+
+  const showNotification = (message, type = 'success') => {
+    setNotification({ show: true, message, type });
+  };
+
+  const fetchRates = async () => {
+    try {
+      const response = await axios.get('/api/rates');
+      const filteredRates = response.data.filter(
+        rate => rate.customer_type === customerTypeMap[activeTab]
+      );
+      setRates(filteredRates);
+    } catch (error) {
+      console.error('Error fetching rates:', error);
+      showNotification('Failed to fetch rates', 'error');
+    }
+  };
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editingIndex !== null) {
-      const updated = [...rates[activeTab]];
-      updated[editingIndex] = { ...form };
-      setRates({ ...rates, [activeTab]: updated });
-      setEditingIndex(null);
-    } else {
-      setRates({ ...rates, [activeTab]: [...rates[activeTab], { ...form }] });
+    try {
+      if (editingId !== null) {
+        await axios.put(`/api/rates/${editingId}`, {
+          minimum_charge: form.minimum_charge,
+          rate_per_cu_m: form.rate_per_cu_m
+        });
+        showNotification('Rate updated successfully');
+      } else {
+        await axios.post('/api/rates', {
+          customer_type: customerTypeMap[activeTab],
+          minimum_charge: form.minimum_charge,
+          rate_per_cu_m: form.rate_per_cu_m
+        });
+        showNotification('Rate added successfully');
+      }
+      fetchRates();
+      setForm({ minimum_charge: '', rate_per_cu_m: '' });
+      setEditingId(null);
+    } catch (error) {
+      console.error('Error saving rate:', error);
+      showNotification(error.response?.data?.message || 'Failed to save rate', 'error');
     }
-    setForm({ min_charge: '', per_cubic: '' });
   };
 
-  const handleEdit = (idx) => {
-    setForm(rates[activeTab][idx]);
-    setEditingIndex(idx);
+  const handleEdit = (rate) => {
+    setForm({
+      minimum_charge: rate.minimum_charge,
+      rate_per_cu_m: rate.rate_per_cu_m
+    });
+    setEditingId(rate.id);
   };
 
-  const handleDelete = (idx) => {
-    const updated = rates[activeTab].filter((_, i) => i !== idx);
-    setRates({ ...rates, [activeTab]: updated });
-    setEditingIndex(null);
-    setForm({ min_charge: '', per_cubic: '' });
+  const handleDelete = async (id) => {
+    if (!confirm('Are you sure you want to delete this rate?')) return;
+    
+    try {
+      await axios.delete(`/api/rates/${id}`);
+      showNotification('Rate deleted successfully');
+      fetchRates();
+    } catch (error) {
+      console.error('Error deleting rate:', error);
+      showNotification('Failed to delete rate', 'error');
+    }
+  };
+
+  const handleCloseNotification = () => {
+    setNotification(prev => ({ ...prev, show: false }));
   };
 
   return (
@@ -111,92 +174,128 @@ const RateManagement = () => {
         <div className="lg:ml-[240px] p-3 sm:p-4 md:p-6 lg:p-6 pt-16 lg:pt-6">
           <h1 className="text-2xl font-bold mb-8">Rate Management</h1>
           <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-md p-10">
+            {notification.show && (
+              <Notification
+                message={notification.message}
+                type={notification.type}
+                onClose={handleCloseNotification}
+              />
+            )}
+
             {/* Tabs */}
             <div className="flex border-b mb-8">
               {accountTypes.map(type => (
                 <button
                   key={type}
                   className={`px-8 py-3 text-lg font-semibold focus:outline-none transition-colors ${activeTab === type ? 'text-blue-600 border-b-4 border-blue-600' : 'text-gray-500'}`}
-                  onClick={() => { setActiveTab(type); setForm({ min_charge: '', per_cubic: '' }); setEditingIndex(null); }}
+                  onClick={() => {
+                    setActiveTab(type);
+                    setForm({ minimum_charge: '', rate_per_cu_m: '' });
+                    setEditingId(null);
+                  }}
                 >
                   {type}
                 </button>
               ))}
             </div>
-            {/* Tab Content */}
-            <div>
-              <form onSubmit={handleSubmit} className="space-y-6 mb-10">
-                <div className="flex gap-8">
-                  <div className="flex-1">
-                    <label className="block text-base font-medium mb-2">Minimum Charge</label>
-                    <input
-                      type="number"
-                      name="min_charge"
-                      value={form.min_charge}
-                      onChange={handleChange}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
-                      required
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-base font-medium mb-2">Rate per Cubic Meter</label>
-                    <input
-                      type="number"
-                      name="per_cubic"
-                      value={form.per_cubic}
-                      onChange={handleChange}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
-                      required
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-6 mb-10">
+              <div className="flex gap-8">
+                <div className="flex-1">
+                  <label className="block text-base font-medium mb-2">Minimum Charge</label>
+                  <input
+                    type="number"
+                    name="minimum_charge"
+                    value={form.minimum_charge}
+                    onChange={handleChange}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
+                    required
+                    min="0"
+                    step="0.01"
+                  />
                 </div>
+                <div className="flex-1">
+                  <label className="block text-base font-medium mb-2">Rate per Cubic Meter</label>
+                  <input
+                    type="number"
+                    name="rate_per_cu_m"
+                    value={form.rate_per_cu_m}
+                    onChange={handleChange}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
+                    required
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-base font-semibold"
+              >
+                {editingId !== null ? 'Update' : 'Add'} Rate
+              </button>
+              {editingId !== null && (
                 <button
-                  type="submit"
-                  className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-base font-semibold"
+                  type="button"
+                  onClick={() => {
+                    setForm({ minimum_charge: '', rate_per_cu_m: '' });
+                    setEditingId(null);
+                  }}
+                  className="ml-4 bg-gray-300 text-gray-800 px-5 py-2 rounded-lg hover:bg-gray-400 text-base font-semibold"
                 >
-                  {editingIndex !== null ? 'Update' : 'Add'} Rate
+                  Cancel
                 </button>
-                {editingIndex !== null && (
-                  <button
-                    type="button"
-                    onClick={() => { setForm({ min_charge: '', per_cubic: '' }); setEditingIndex(null); }}
-                    className="ml-4 bg-gray-300 text-gray-800 px-5 py-2 rounded-lg hover:bg-gray-400 text-base font-semibold"
-                  >
-                    Cancel
-                  </button>
-                )}
-              </form>
-              <h2 className="text-xl font-bold mb-6">{activeTab} Rates</h2>
-              <table className="w-full border border-gray-200 rounded-lg overflow-hidden text-base">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="py-2 px-4 text-left">Minimum Charge</th>
-                    <th className="py-2 px-4 text-left">Rate per Cubic Meter</th>
-                    <th className="py-2 px-4">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rates[activeTab].length === 0 ? (
-                    <tr><td colSpan="3" className="text-center py-4 text-gray-400">No rates set.</td></tr>
-                  ) : (
-                    rates[activeTab].map((rate, idx) => (
-                      <tr key={idx}>
-                        <td className="py-2 px-4">{rate.min_charge}</td>
-                        <td className="py-2 px-4">{rate.per_cubic}</td>
-                        <td className="py-2 px-4">
-                          <button onClick={() => handleEdit(idx)} className="text-blue-600 hover:underline mr-4 text-base font-medium px-3 py-1">Edit</button>
-                          <button onClick={() => handleDelete(idx)} className="text-red-600 hover:underline text-base font-medium px-3 py-1">Delete</button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+              )}
+            </form>
+
+            {/* Rate Information */}
+            <div className="mb-8">
+              <h2 className="text-xl font-bold mb-4">Current Rate Information</h2>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="mb-2"><span className="font-semibold">Customer Type:</span> {activeTab}</p>
+                <p className="mb-2"><span className="font-semibold">Number of Rates:</span> {rates.length}</p>
+                <p className="mb-2"><span className="font-semibold">Latest Update:</span> {rates[0]?.updated_at ? new Date(rates[0].updated_at).toLocaleDateString() : 'No rates yet'}</p>
+              </div>
             </div>
+
+            {/* Rates Table */}
+            <h2 className="text-xl font-bold mb-6">{activeTab} Rates</h2>
+            <table className="w-full border border-gray-200 rounded-lg overflow-hidden text-base">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="py-2 px-4 text-left">Minimum Charge</th>
+                  <th className="py-2 px-4 text-left">Rate per Cubic Meter</th>
+                  <th className="py-2 px-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rates.length === 0 ? (
+                  <tr><td colSpan="3" className="text-center py-4 text-gray-400">No rates set.</td></tr>
+                ) : (
+                  rates.map((rate) => (
+                    <tr key={rate.id}>
+                      <td className="py-2 px-4">{rate.minimum_charge}</td>
+                      <td className="py-2 px-4">{rate.rate_per_cu_m}</td>
+                      <td className="py-2 px-4">
+                        <button
+                          onClick={() => handleEdit(rate)}
+                          className="text-blue-600 hover:underline mr-4 text-base font-medium px-3 py-1"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(rate.id)}
+                          className="text-red-600 hover:underline text-base font-medium px-3 py-1"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

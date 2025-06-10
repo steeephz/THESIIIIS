@@ -18,13 +18,12 @@ return new class extends Migration
 
         // Insert superadmin account
         DB::table('staff_tb')->insert([
-            [
-                'username' => 'superadmin',
-                'name' => 'Super Admin',
-                'password' => Hash::make('superadmin123!'),
-                'created_at' => now(),
-                'updated_at' => now()
-            ]
+            'name' => 'Super Admin',
+            'username' => 'superadmin',
+            'password' => Hash::make('superadmin'),
+            'role' => 'superadmin',
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 
@@ -33,7 +32,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // If you want to revert, you can insert the previous accounts back
-        // For now, we will just leave it empty
+        DB::table('staff_tb')->where('username', 'superadmin')->delete();
     }
 }; 
