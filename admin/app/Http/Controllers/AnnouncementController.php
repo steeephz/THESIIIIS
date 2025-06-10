@@ -10,12 +10,31 @@ class AnnouncementController extends Controller
 {
     public function index()
     {
-        $announcements = DB::table('announcements_tb')
-            ->where('status', 'active')
-            ->orderBy('created_at', 'desc')
-            ->get();
+        try {
+            $announcements = DB::table('announcements_tb')
+                ->select([
+                    'id',
+                    'title',
+                    'body',
+                    'status',
+                    'staff_id',
+                    'posted_by',
+                    'published_at',
+                    'expired_at',
+                    'created_at',
+                    'updated_at'
+                ])
+                ->where('status', 'active')
+                ->orderBy('created_at', 'desc')
+                ->get();
 
-        return response()->json($announcements);
+            return response()->json($announcements);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to fetch announcements',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function store(Request $request)

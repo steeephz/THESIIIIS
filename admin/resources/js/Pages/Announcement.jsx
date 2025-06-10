@@ -22,6 +22,8 @@ const Announcement = () => {
   const [form, setForm] = useState({ title: '', content: '', start_date: '', end_date: '' });
   const [editingId, setEditingId] = useState(null);
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchAnnouncements();
@@ -46,7 +48,15 @@ const Announcement = () => {
   const fetchAnnouncements = async () => {
     try {
       const response = await axios.get('/api/announcements');
-      setAnnouncements(response.data);
+      console.log('Fetched announcements:', response.data); // Debug log
+      if (Array.isArray(response.data)) {
+        setAnnouncements(response.data);
+      } else if (response.data.data && Array.isArray(response.data.data)) {
+        setAnnouncements(response.data.data);
+      } else {
+        console.error('Unexpected response format:', response.data);
+        showNotification('Error loading announcements: Invalid data format', 'error');
+      }
     } catch (error) {
       console.error('Error fetching announcements:', error);
       showNotification('Failed to fetch announcements', 'error');
@@ -105,6 +115,7 @@ const Announcement = () => {
       fetchAnnouncements();
       setForm({ title: '', content: '', start_date: '', end_date: '' });
       setEditingId(null);
+      setShowCreateModal(false);
     } catch (error) {
       console.error('Error saving announcement:', error);
       showNotification(error.response?.data?.message || 'Failed to save announcement', 'error');
@@ -119,6 +130,7 @@ const Announcement = () => {
       end_date: new Date(announcement.expired_at).toISOString().split('T')[0],
     });
     setEditingId(announcement.id);
+    setShowCreateModal(true);
   };
 
   const handleDelete = async (id) => {
@@ -131,12 +143,18 @@ const Announcement = () => {
       if (editingId === id) {
         setForm({ title: '', content: '', start_date: '', end_date: '' });
         setEditingId(null);
+        setShowCreateModal(false);
       }
     } catch (error) {
       console.error('Error deleting announcement:', error);
-      showNotification('Failed to delete announcement', 'error');
+      showNotification(error.response?.data?.message || 'Failed to delete announcement', 'error');
     }
   };
+
+  const filteredAnnouncements = announcements.filter(announcement => 
+    announcement.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    announcement.body.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <DynamicTitleLayout userRole="admin">
@@ -214,21 +232,55 @@ const Announcement = () => {
 
         {/* Main Content */}
         <div className="lg:ml-[240px] p-3 sm:p-4 md:p-6 lg:p-6 pt-16 lg:pt-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
-            <h1 className="text-xl font-semibold">Announcements</h1>
-            <div className="flex items-center w-full sm:w-auto gap-2">
-              <Link href="/admin/profile">
-                <img
-                  src={profilePicture || `https://ui-avatars.com/api/?name=${auth?.user?.name || 'Admin'}&background=0D8ABC&color=fff`}
-                  alt="Profile"
-                  className="w-8 h-8 rounded-full cursor-pointer hover:opacity-80 transition-opacity object-cover"
-                />
-              </Link>
+          {/* Header Section */}
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-xl font-semibold">Manage Announcements</h1>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">{auth?.user?.name}</span>
+                <Link href="/admin/profile">
+                  <img
+                    src={profilePicture || `https://ui-avatars.com/api/?name=${auth?.user?.name || 'Admin'}&background=0D8ABC&color=fff`}
+                    alt="Profile"
+                    className="w-8 h-8 rounded-full cursor-pointer hover:opacity-80 transition-opacity object-cover"
+                  />
+                </Link>
+              </div>
             </div>
           </div>
 
-          {/* Notification Component */}
+          {/* Create and Search Section */}
+          <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div className="flex items-center gap-4 w-full sm:w-auto">
+                <button
+                  onClick={() => {
+                    setForm({ title: '', content: '', start_date: '', end_date: '' });
+                    setEditingId(null);
+                    setShowCreateModal(true);
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined">add</span>
+                  Create Announcement
+                </button>
+                <div className="relative flex-1 sm:w-64">
+                  <input
+                    type="text"
+                    placeholder="Search announcements..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                  />
+                  <span className="material-symbols-outlined absolute left-3 top-2.5 text-gray-400">
+                    search
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Notification */}
           {notification.show && (
             <Notification
               message={notification.message}
@@ -237,93 +289,133 @@ const Announcement = () => {
             />
           )}
 
-          {/* Announcement CRUD Feature */}
-          <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-md p-6">
-            <form onSubmit={handleSubmit} className="mb-6 space-y-3">
-              <input
-                type="text"
-                name="title"
-                placeholder="Title"
-                value={form.title}
-                onChange={handleChange}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                required
-              />
-              <textarea
-                name="content"
-                placeholder="Content"
-                value={form.content}
-                onChange={handleChange}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                rows={3}
-                required
-              />
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    name="start_date"
-                    value={form.start_date}
-                    onChange={handleChange}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                    required
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-1">End Date</label>
-                  <input
-                    type="date"
-                    name="end_date"
-                    value={form.end_date}
-                    onChange={handleChange}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                    required
-                  />
-                </div>
-              </div>
-              <button
-                type="submit"
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-              >
-                {editingId ? 'Update' : 'Create'} Announcement
-              </button>
-              {editingId && (
-                <button
-                  type="button"
-                  onClick={() => { setForm({ title: '', content: '', start_date: '', end_date: '' }); setEditingId(null); }}
-                  className="ml-2 bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-              )}
-            </form>
-            <ul className="space-y-6">
-              {announcements.map(a => (
-                <li key={a.id} className="border rounded-2xl p-8 flex flex-col gap-2 bg-gray-50 shadow-md">
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-lg font-semibold text-blue-800">{a.title}</h2>
+          {/* Create/Edit Modal */}
+          {showCreateModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl p-6 w-full max-w-2xl mx-4">
+                <h2 className="text-xl font-semibold mb-4">
+                  {editingId ? 'Edit Announcement' : 'Create New Announcement'}
+                </h2>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <input
+                      type="text"
+                      name="title"
+                      placeholder="Enter title"
+                      value={form.title}
+                      onChange={handleChange}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
+                    <textarea
+                      name="content"
+                      placeholder="Enter content"
+                      value={form.content}
+                      onChange={handleChange}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                      rows={4}
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <button
-                        onClick={() => handleEdit(a)}
-                        className="mr-2"
-                        title="Edit"
-                      >
-                        <img src="https://cdn-icons-png.flaticon.com/512/6325/6325975.png" alt="Edit" className="w-6 h-6 inline" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(a.id)}
-                        className="text-red-600 hover:text-red-800"
-                        title="Delete"
-                      >
-                        <img src="https://cdn-icons-png.flaticon.com/512/1214/1214428.png" alt="Delete" className="w-6 h-6 inline" />
-                      </button>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        name="start_date"
+                        value={form.start_date}
+                        onChange={handleChange}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                      <input
+                        type="date"
+                        name="end_date"
+                        value={form.end_date}
+                        onChange={handleChange}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                        required
+                      />
                     </div>
                   </div>
-                  <p className="text-gray-700">{a.body}</p>
-                </li>
-              ))}
-            </ul>
+                  <div className="flex justify-end gap-2 mt-6">
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateModal(false)}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      {editingId ? 'Update' : 'Create'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Announcements List */}
+          <div className="bg-white rounded-xl shadow-md overflow-hidden">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold mb-4">All Announcements</h2>
+              <div className="space-y-4">
+                {/* Debug info */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="mb-4 p-4 bg-gray-100 rounded">
+                    <p>Total announcements: {announcements.length}</p>
+                    <p>Filtered announcements: {filteredAnnouncements.length}</p>
+                  </div>
+                )}
+                
+                {filteredAnnouncements.length > 0 ? (
+                  filteredAnnouncements.map(announcement => (
+                    <div key={announcement.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h3 className="text-lg font-semibold text-blue-800">{announcement.title}</h3>
+                          <p className="text-sm text-gray-500">
+                            Posted by: {announcement.posted_by || 'Unknown'} | 
+                            Valid: {new Date(announcement.published_at).toLocaleDateString()} - {new Date(announcement.expired_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleEdit(announcement)}
+                            className="text-blue-600 hover:text-blue-800"
+                            title="Edit"
+                          >
+                            <span className="material-symbols-outlined">edit</span>
+                          </button>
+                          <button
+                            onClick={() => handleDelete(announcement.id)}
+                            className="text-red-600 hover:text-red-800"
+                            title="Delete"
+                          >
+                            <span className="material-symbols-outlined">delete</span>
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-gray-700">{announcement.body}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    {searchQuery ? 'No announcements found matching your search.' : 'No announcements available.'}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
