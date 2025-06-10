@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import DynamicTitleLayout from '@/Layouts/DynamicTitleLayout';
+import Notification from '@/Components/Notification';
 
 const initialAnnouncements = [
   { id: 1, title: 'Water Interruption', content: 'There will be a scheduled water interruption on May 25, 2025.' },
@@ -17,23 +18,51 @@ const durationOptions = [
 const Announcement = () => {
   const { auth } = usePage().props;
   const [profilePicture, setProfilePicture] = useState(null);
-  const [announcements, setAnnouncements] = useState(initialAnnouncements);
+  const [announcements, setAnnouncements] = useState([]);
   const [form, setForm] = useState({ title: '', content: '', start_date: '', end_date: '' });
   const [editingId, setEditingId] = useState(null);
+  const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
 
   useEffect(() => {
-    const fetchProfileData = async () => {
-      try {
-        const response = await axios.get('/api/admin/profile');
-        if (response.data && response.data.profile_picture) {
-          setProfilePicture(response.data.profile_picture);
-        }
-      } catch (error) {
-        // ignore error for now
-      }
-    };
+    fetchAnnouncements();
     fetchProfileData();
   }, []);
+
+  // Auto-hide notification after 3 seconds
+  useEffect(() => {
+    if (notification.show) {
+      const timer = setTimeout(() => {
+        setNotification(prev => ({ ...prev, show: false }));
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [notification.show]);
+
+  const showNotification = (message, type = 'success') => {
+    setNotification({ show: true, message, type });
+  };
+
+  const fetchAnnouncements = async () => {
+    try {
+      const response = await axios.get('/api/announcements');
+      setAnnouncements(response.data);
+    } catch (error) {
+      console.error('Error fetching announcements:', error);
+      showNotification('Failed to fetch announcements', 'error');
+    }
+  };
+
+  const fetchProfileData = async () => {
+    try {
+      const response = await axios.get('/api/admin/profile');
+      if (response.data && response.data.profile_picture) {
+        setProfilePicture(response.data.profile_picture);
+      }
+    } catch (error) {
+      // ignore error for now
+    }
+  };
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -48,39 +77,64 @@ const Announcement = () => {
     return endDate <= maxEnd;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateDuration(form.start_date, form.end_date)) {
-      alert('End date must not be more than 1 month after start date.');
+      showNotification('End date must not be more than 1 month after start date', 'error');
       return;
     }
-    if (editingId) {
-      setAnnouncements(announcements.map(a => a.id === editingId ? { ...a, ...form } : a));
+
+    try {
+      if (editingId) {
+        await axios.put(`/api/announcements/${editingId}`, {
+          title: form.title,
+          content: form.content,
+          start_date: form.start_date,
+          end_date: form.end_date
+        });
+        showNotification('Announcement updated successfully');
+      } else {
+        await axios.post('/api/announcements', {
+          title: form.title,
+          content: form.content,
+          start_date: form.start_date,
+          end_date: form.end_date
+        });
+        showNotification('Announcement created successfully');
+      }
+      fetchAnnouncements();
+      setForm({ title: '', content: '', start_date: '', end_date: '' });
       setEditingId(null);
-    } else {
-      setAnnouncements([
-        ...announcements,
-        { id: Date.now(), ...form },
-      ]);
+    } catch (error) {
+      console.error('Error saving announcement:', error);
+      showNotification(error.response?.data?.message || 'Failed to save announcement', 'error');
     }
-    setForm({ title: '', content: '', start_date: '', end_date: '' });
   };
 
   const handleEdit = (announcement) => {
     setForm({
       title: announcement.title,
-      content: announcement.content,
-      start_date: announcement.start_date || '',
-      end_date: announcement.end_date || '',
+      content: announcement.body,
+      start_date: new Date(announcement.published_at).toISOString().split('T')[0],
+      end_date: new Date(announcement.expired_at).toISOString().split('T')[0],
     });
     setEditingId(announcement.id);
   };
 
-  const handleDelete = (id) => {
-    setAnnouncements(announcements.filter(a => a.id !== id));
-    if (editingId === id) {
-      setForm({ title: '', content: '', start_date: '', end_date: '' });
-      setEditingId(null);
+  const handleDelete = async (id) => {
+    if (!confirm('Are you sure you want to delete this announcement?')) return;
+    
+    try {
+      await axios.delete(`/api/announcements/${id}`);
+      showNotification('Announcement deleted successfully');
+      fetchAnnouncements();
+      if (editingId === id) {
+        setForm({ title: '', content: '', start_date: '', end_date: '' });
+        setEditingId(null);
+      }
+    } catch (error) {
+      console.error('Error deleting announcement:', error);
+      showNotification('Failed to delete announcement', 'error');
     }
   };
 
@@ -174,6 +228,15 @@ const Announcement = () => {
             </div>
           </div>
 
+          {/* Notification Component */}
+          {notification.show && (
+            <Notification
+              message={notification.message}
+              type={notification.type}
+              onClose={() => setNotification(prev => ({ ...prev, show: false }))}
+            />
+          )}
+
           {/* Announcement CRUD Feature */}
           <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-md p-6">
             <form onSubmit={handleSubmit} className="mb-6 space-y-3">
@@ -257,7 +320,7 @@ const Announcement = () => {
                       </button>
                     </div>
                   </div>
-                  <p className="text-gray-700">{a.content}</p>
+                  <p className="text-gray-700">{a.body}</p>
                 </li>
               ))}
             </ul>

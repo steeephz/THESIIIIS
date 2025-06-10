@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\BillHandlerController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\RateController;
+use App\Http\Controllers\AnnouncementController;
 
 /*
 |--------------------------------------------------------------------------
@@ -61,6 +62,12 @@ Route::middleware(['auth:sanctum', 'web'])->group(function () {
     Route::post('/rates', [RateController::class, 'store']);
     Route::put('/rates/{id}', [RateController::class, 'update']);
     Route::delete('/rates/{id}', [RateController::class, 'destroy']);
+
+    // Announcement Routes
+    Route::get('/announcements', [AnnouncementController::class, 'index']);
+    Route::post('/announcements', [AnnouncementController::class, 'store']);
+    Route::put('/announcements/{id}', [AnnouncementController::class, 'update']);
+    Route::delete('/announcements/{id}', [AnnouncementController::class, 'destroy']);
 });
 
 // Temporary debug route
