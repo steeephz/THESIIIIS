@@ -1,51 +1,203 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from '@inertiajs/react';
 import axios from 'axios';
 import DynamicTitleLayout from '@/Layouts/DynamicTitleLayout';
-
-const initialTickets = [
-  { id: 101, subject: 'No water supply', status: 'Open', created: '2025-05-20' },
-  { id: 102, subject: 'Billing issue', status: 'Closed', created: '2025-05-18' },
-  { id: 103, subject: 'Request for reconnection', status: 'Open', created: '2025-05-17' },
-];
+import DatePicker from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
 
 const statusOptions = [
-  { label: 'Resolved', value: 'Resolved' },
-  { label: 'Pending', value: 'Pending' },
-  { label: 'Unresolvable', value: 'Unresolvable' },
+  { label: 'All Status', value: 'all' },
+  { label: 'Open', value: 'open' },
+  { label: 'Pending', value: 'pending' },
+  { label: 'Resolved', value: 'resolved' },
+  { label: 'Closed', value: 'closed' }
 ];
+
+const statusUpdateOptions = [
+  { label: 'Open', value: 'open' },
+  { label: 'Pending', value: 'pending' },
+  { label: 'Resolved', value: 'resolved' },
+  { label: 'Closed', value: 'closed' }
+];
+
+const initialTickets = [
+  {
+    id: 1001,
+    subject: 'Water Pressure Issue',
+    status: 'open',
+    created: '2024-03-20T09:30:00',
+    remarks: 'Customer reported low water pressure in the morning',
+    remarksHistory: [
+      {
+        id: 1,
+        remarks: 'Customer reported low water pressure in the morning',
+        timestamp: '2024-03-20T09:30:00',
+        user: 'Admin User'
+      }
+    ]
+  },
+  {
+    id: 1002,
+    subject: 'Billing Dispute',
+    status: 'pending',
+    created: '2024-03-19T14:15:00',
+    remarks: 'Customer questioning unusually high bill amount',
+    remarksHistory: [
+      {
+        id: 1,
+        remarks: 'Initial complaint received',
+        timestamp: '2024-03-19T14:15:00',
+        user: 'Admin User'
+      },
+      {
+        id: 2,
+        remarks: 'Customer questioning unusually high bill amount',
+        timestamp: '2024-03-19T15:30:00',
+        user: 'Support Staff'
+      }
+    ]
+  },
+  {
+    id: 1003,
+    subject: 'Meter Reading Request',
+    status: 'resolved',
+    created: '2024-03-18T11:45:00',
+    remarks: 'Customer requested manual meter reading verification',
+    remarksHistory: [
+      {
+        id: 1,
+        remarks: 'Customer requested manual meter reading verification',
+        timestamp: '2024-03-18T11:45:00',
+        user: 'Admin User'
+      },
+      {
+        id: 2,
+        remarks: 'Meter reading verified and updated in system',
+        timestamp: '2024-03-18T14:20:00',
+        user: 'Technical Staff'
+      }
+    ]
+  },
+  {
+    id: 1004,
+    subject: 'Leak Report',
+    status: 'closed',
+    created: '2024-03-17T16:20:00',
+    remarks: 'Major leak in main water line, emergency repair completed',
+    remarksHistory: [
+      {
+        id: 1,
+        remarks: 'Emergency leak reported',
+        timestamp: '2024-03-17T16:20:00',
+        user: 'Admin User'
+      },
+      {
+        id: 2,
+        remarks: 'Repair team dispatched',
+        timestamp: '2024-03-17T16:45:00',
+        user: 'Support Staff'
+      },
+      {
+        id: 3,
+        remarks: 'Major leak in main water line, emergency repair completed',
+        timestamp: '2024-03-17T18:30:00',
+        user: 'Technical Staff'
+      }
+    ]
+  },
+  {
+    id: 1005,
+    subject: 'Service Reconnection',
+    status: 'open',
+    created: '2024-03-16T10:00:00',
+    remarks: 'Customer requesting service reconnection after payment',
+    remarksHistory: [
+      {
+        id: 1,
+        remarks: 'Customer requesting service reconnection after payment',
+        timestamp: '2024-03-16T10:00:00',
+        user: 'Admin User'
+      }
+    ]
+  }
+];
+
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
 
 const Tickets = () => {
   const [tickets, setTickets] = useState(initialTickets);
-  const [form, setForm] = useState({ subject: '' });
+  const [filteredTickets, setFilteredTickets] = useState(initialTickets);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState(null);
   const [viewing, setViewing] = useState(null);
+  const [remarks, setRemarks] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [viewingRemarks, setViewingRemarks] = useState(null);
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  useEffect(() => {
+    let filtered = [...tickets];
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setTickets([
-      ...tickets,
-      { id: Date.now(), subject: form.subject, status: 'Open', created: new Date().toISOString().slice(0, 10) },
-    ]);
-    setForm({ subject: '' });
-  };
-
-  const handleStatusChange = (status) => {
-    if (viewing) {
-      setTickets(tickets.map(t => t.id === viewing.id ? { ...t, status } : t));
-      setViewing({ ...viewing, status });
+    // Apply search filter
+    if (searchQuery) {
+      filtered = filtered.filter(ticket =>
+        ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ticket.id.toString().includes(searchQuery)
+      );
     }
-  };
 
-  const handleView = (ticket) => {
-    setViewing(ticket);
-  };
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(ticket =>
+        ticket.status.toLowerCase() === statusFilter.toLowerCase()
+      );
+    }
 
-  const handleCloseModal = () => {
+    // Apply date filter
+    if (dateFilter) {
+      const filterDate = new Date(dateFilter);
+      filtered = filtered.filter(ticket => {
+        const ticketDate = new Date(ticket.created);
+        return ticketDate.toDateString() === filterDate.toDateString();
+      });
+    }
+
+    setFilteredTickets(filtered);
+  }, [searchQuery, statusFilter, dateFilter, tickets]);
+
+  const handleStatusUpdate = (ticketId, newStatus) => {
+    const updatedTickets = tickets.map(ticket => {
+      if (ticket.id === ticketId) {
+        const newRemarksHistory = [
+          ...ticket.remarksHistory,
+          {
+            id: ticket.remarksHistory.length + 1,
+            remarks: remarks || ticket.remarks,
+            timestamp: new Date().toISOString(),
+            user: 'Admin User' // This should be replaced with actual logged-in user
+          }
+        ];
+        return {
+          ...ticket,
+          status: newStatus,
+          remarks: remarks || ticket.remarks,
+          remarksHistory: newRemarksHistory
+        };
+      }
+      return ticket;
+    });
+    setTickets(updatedTickets);
     setViewing(null);
+    setRemarks('');
   };
 
   return (
@@ -128,8 +280,53 @@ const Tickets = () => {
             <h1 className="text-xl font-semibold">Tickets</h1>
           </div>
 
+          {/* Filters Section */}
+          <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Search */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Search Tickets</label>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by ID or subject..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  {statusOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <DatePicker
+                  selected={dateFilter}
+                  onChange={date => setDateFilter(date)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholderText="Select date"
+                  dateFormat="MMMM d, yyyy"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Tickets Table */}
-          <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6">
+          <div className="bg-white rounded-xl shadow-md p-6">
             <table className="min-w-full text-sm text-left">
               <thead>
                 <tr className="border-b">
@@ -141,28 +338,56 @@ const Tickets = () => {
                 </tr>
               </thead>
               <tbody>
-                {tickets
-                  .slice()
-                  .sort((a, b) => new Date(a.created) - new Date(b.created))
-                  .map(ticket => (
+                {loading ? (
+                  <tr>
+                    <td colSpan="5" className="py-4 text-center">
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                        <span className="ml-2">Loading tickets...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredTickets.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="py-4 text-center text-gray-500">
+                      No tickets found
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTickets.map(ticket => (
                     <tr key={ticket.id} className="border-b hover:bg-blue-50">
                       <td className="py-2 px-4">{ticket.id}</td>
                       <td className="py-2 px-4">{ticket.subject}</td>
                       <td className="py-2 px-4">
-                        <span className={ticket.status === 'Open' ? 'text-green-600' : 'text-gray-500'}>{ticket.status}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            ticket.status === 'open' ? 'bg-green-100 text-green-800' :
+                            ticket.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            ticket.status === 'resolved' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
+                          </span>
+                          <button
+                            onClick={() => setViewingRemarks(ticket)}
+                            className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                          >
+                            Ticket Remarks
+                          </button>
+                        </div>
                       </td>
-                      <td className="py-2 px-4">{ticket.created}</td>
-                      <td className="py-2 px-4 flex gap-2">
+                      <td className="py-2 px-4">{formatDate(ticket.created)}</td>
+                      <td className="py-2 px-4">
                         <button
-                          onClick={() => handleView(ticket)}
-                          className="text-blue-600 hover:text-blue-800"
-                          title="View"
+                          onClick={() => setViewing(ticket)}
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
                         >
-                          👁️ View
+                          View
                         </button>
                       </td>
                     </tr>
-                  ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -171,27 +396,132 @@ const Tickets = () => {
           {viewing && (
             <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
               <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-                <h2 className="text-xl font-bold mb-2">Ticket #{viewing.id}</h2>
-                <p className="mb-2"><span className="font-semibold">Subject:</span> {viewing.subject}</p>
-                <p className="mb-2"><span className="font-semibold">Status:</span> {viewing.status}</p>
-                <p className="mb-2"><span className="font-semibold">Created:</span> {viewing.created}</p>
-                <div className="flex gap-2 mt-4">
-                  {statusOptions.map(option => (
-                    <button
-                      key={option.value}
-                      onClick={() => handleStatusChange(option.value)}
-                      className={`px-4 py-2 rounded-lg font-semibold border transition-colors duration-150 ${viewing.status === option.value ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-blue-100'}`}
+                <h2 className="text-xl font-bold mb-4">Ticket #{viewing.id}</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                    <p className="text-gray-900">{viewing.subject}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      value={viewing.status}
+                      onChange={(e) => setViewing({...viewing, status: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
-                      {option.label}
-                    </button>
-                  ))}
+                      {statusUpdateOptions.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Created</label>
+                    <p className="text-gray-900">{formatDate(viewing.created)}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ticket Remarks</label>
+                    <textarea
+                      value={remarks}
+                      onChange={(e) => setRemarks(e.target.value)}
+                      placeholder="Add remarks about this ticket..."
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      rows="4"
+                    />
+                  </div>
                 </div>
-                <button
-                  onClick={handleCloseModal}
-                  className="mt-6 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                >
-                  Close
-                </button>
+                <div className="mt-6 flex justify-end space-x-3">
+                  <button
+                    onClick={() => {
+                      setViewing(null);
+                      setRemarks('');
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleStatusUpdate(viewing.id, viewing.status)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    Update Ticket
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* View Remarks Modal */}
+          {viewingRemarks && (
+            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold">Ticket #{viewingRemarks.id} Remarks</h2>
+                  <button
+                    onClick={() => setViewingRemarks(null)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                    <p className="text-gray-900">{viewingRemarks.subject}</p>
+                  </div>
+                  
+                  {/* Remarks History */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Remarks History</label>
+                    <div className="bg-gray-50 rounded-lg divide-y divide-gray-200 max-h-60 overflow-y-auto">
+                      {viewingRemarks.remarksHistory.map((history, index) => (
+                        <div key={history.id} className="p-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex items-center">
+                              <span className="text-sm font-medium text-gray-900">{history.user}</span>
+                              <span className="mx-2 text-gray-400">•</span>
+                              <span className="text-sm text-gray-500">{formatDate(history.timestamp)}</span>
+                            </div>
+                          </div>
+                          <p className="text-gray-700 whitespace-pre-wrap">{history.remarks}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Add New Remarks */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Add New Remarks</label>
+                    <textarea
+                      value={remarks}
+                      onChange={(e) => setRemarks(e.target.value)}
+                      placeholder="Add new remarks..."
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      rows="4"
+                    />
+                  </div>
+                </div>
+                <div className="mt-6 flex justify-end space-x-3">
+                  <button
+                    onClick={() => {
+                      setViewingRemarks(null);
+                      setRemarks('');
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleStatusUpdate(viewingRemarks.id, viewingRemarks.status);
+                      setViewingRemarks(null);
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    Update Remarks
+                  </button>
+                </div>
               </div>
             </div>
           )}
