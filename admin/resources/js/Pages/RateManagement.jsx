@@ -171,9 +171,11 @@ const RateManagement = () => {
             </div>
           </nav>
         </div>
+
         <div className="lg:ml-[240px] p-3 sm:p-4 md:p-6 lg:p-6 pt-16 lg:pt-6">
-          <h1 className="text-2xl font-bold mb-8">Rate Management</h1>
+          <h1 className="text-xl font-semibold mb-8">Rate Management</h1>
           <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-md p-10">
+            {/* Notification */}
             {notification.show && (
               <Notification
                 message={notification.message}
@@ -188,11 +190,7 @@ const RateManagement = () => {
                 <button
                   key={type}
                   className={`px-8 py-3 text-lg font-semibold focus:outline-none transition-colors ${activeTab === type ? 'text-blue-600 border-b-4 border-blue-600' : 'text-gray-500'}`}
-                  onClick={() => {
-                    setActiveTab(type);
-                    setForm({ minimum_charge: '', rate_per_cu_m: '' });
-                    setEditingId(null);
-                  }}
+                  onClick={() => { setActiveTab(type); setForm({ minimum_charge: '', rate_per_cu_m: '' }); setEditingId(null); }}
                 >
                   {type}
                 </button>
@@ -200,102 +198,105 @@ const RateManagement = () => {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-6 mb-10">
-              <div className="flex gap-8">
-                <div className="flex-1">
-                  <label className="block text-base font-medium mb-2">Minimum Charge</label>
+            <form onSubmit={handleSubmit} className="mb-8 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Minimum Charge (₱)
+                  </label>
                   <input
                     type="number"
                     name="minimum_charge"
                     value={form.minimum_charge}
                     onChange={handleChange}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
                     required
-                    min="0"
                     step="0.01"
+                    min="0"
                   />
                 </div>
-                <div className="flex-1">
-                  <label className="block text-base font-medium mb-2">Rate per Cubic Meter</label>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Rate per Cubic Meter (₱)
+                  </label>
                   <input
                     type="number"
                     name="rate_per_cu_m"
                     value={form.rate_per_cu_m}
                     onChange={handleChange}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
                     required
-                    min="0"
                     step="0.01"
+                    min="0"
                   />
                 </div>
               </div>
-              <button
-                type="submit"
-                className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-base font-semibold"
-              >
-                {editingId !== null ? 'Update' : 'Add'} Rate
-              </button>
-              {editingId !== null && (
+              <div className="flex gap-2">
                 <button
-                  type="button"
-                  onClick={() => {
-                    setForm({ minimum_charge: '', rate_per_cu_m: '' });
-                    setEditingId(null);
-                  }}
-                  className="ml-4 bg-gray-300 text-gray-800 px-5 py-2 rounded-lg hover:bg-gray-400 text-base font-semibold"
+                  type="submit"
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
                 >
-                  Cancel
+                  {editingId ? 'Update' : 'Add'} Rate
                 </button>
-              )}
+                {editingId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm({ minimum_charge: '', rate_per_cu_m: '' });
+                      setEditingId(null);
+                    }}
+                    className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
             </form>
 
-            {/* Rate Information */}
-            <div className="mb-8">
-              <h2 className="text-xl font-bold mb-4">Current Rate Information</h2>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="mb-2"><span className="font-semibold">Customer Type:</span> {activeTab}</p>
-                <p className="mb-2"><span className="font-semibold">Number of Rates:</span> {rates.length}</p>
-                <p className="mb-2"><span className="font-semibold">Latest Update:</span> {rates[0]?.updated_at ? new Date(rates[0].updated_at).toLocaleDateString() : 'No rates yet'}</p>
-              </div>
-            </div>
-
             {/* Rates Table */}
-            <h2 className="text-xl font-bold mb-6">{activeTab} Rates</h2>
-            <table className="w-full border border-gray-200 rounded-lg overflow-hidden text-base">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="py-2 px-4 text-left">Minimum Charge</th>
-                  <th className="py-2 px-4 text-left">Rate per Cubic Meter</th>
-                  <th className="py-2 px-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rates.length === 0 ? (
-                  <tr><td colSpan="3" className="text-center py-4 text-gray-400">No rates set.</td></tr>
-                ) : (
-                  rates.map((rate) => (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Minimum Charge
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Rate per Cubic Meter
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {rates.map(rate => (
                     <tr key={rate.id}>
-                      <td className="py-2 px-4">{rate.minimum_charge}</td>
-                      <td className="py-2 px-4">{rate.rate_per_cu_m}</td>
-                      <td className="py-2 px-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        ₱{parseFloat(rate.minimum_charge).toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        ₱{parseFloat(rate.rate_per_cu_m).toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <button
                           onClick={() => handleEdit(rate)}
-                          className="text-blue-600 hover:underline mr-4 text-base font-medium px-3 py-1"
+                          className="text-blue-600 hover:text-blue-800 mr-3"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => handleDelete(rate.id)}
-                          className="text-red-600 hover:underline text-base font-medium px-3 py-1"
+                          className="text-red-600 hover:text-red-800"
                         >
                           Delete
                         </button>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
