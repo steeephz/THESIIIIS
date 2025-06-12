@@ -47,13 +47,9 @@ const BillHandlerLayout = ({ children }) => {
                             <span className="material-symbols-outlined mr-3">group</span>
                             Customers
                         </Link>
-                        <Link href="/bill-handler/meter-reading" className={`flex items-center px-6 py-3 text-base ${currentPath === '/bill-handler/meter-reading' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                            <span className="material-symbols-outlined mr-3">speed</span>
-                            Meter Reading
-                        </Link>
-                        <Link href="/bill-handler/reports" className={`flex items-center px-6 py-3 text-base ${currentPath === '/bill-handler/reports' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                            <span className="material-symbols-outlined mr-3">description</span>
-                            Reports
+                        <Link href="/bill-handler/tickets" className={`flex items-center px-6 py-3 text-base ${currentPath === '/bill-handler/tickets' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
+                            <span className="material-symbols-outlined mr-3">confirmation_number</span>
+                            Tickets
                         </Link>
                         <Link href="/bill-handler/profile" className={`flex items-center px-6 py-3 text-base ${currentPath === '/bill-handler/profile' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
                             <span className="material-symbols-outlined mr-3">person</span>

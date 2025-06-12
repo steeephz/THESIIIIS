@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import DynamicTitleLayout from '@/Layouts/DynamicTitleLayout';
+import BillHandlerLayout from '@/Layouts/BillHandlerLayout';
+import AdminLayout from '@/Layouts/AdminLayout';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -144,6 +146,11 @@ const Tickets = () => {
   const [loading, setLoading] = useState(false);
   const [viewingRemarks, setViewingRemarks] = useState(null);
 
+  // Determine layout based on path
+  const isBillHandler = typeof window !== 'undefined' && window.location.pathname.startsWith('/bill-handler');
+  const Layout = isBillHandler ? BillHandlerLayout : AdminLayout;
+  const userRole = isBillHandler ? 'bill handler' : 'admin';
+
   useEffect(() => {
     let filtered = [...tickets];
 
@@ -201,332 +208,253 @@ const Tickets = () => {
   };
 
   return (
-    <DynamicTitleLayout userRole="admin">
-      <div className="min-h-screen bg-[#60B5FF] font-[Poppins] overflow-x-hidden">
-        {/* Sidebar */}
-        <div className="fixed left-0 top-0 h-full w-[240px] bg-white shadow-lg transform transition-transform duration-200 lg:translate-x-0 md:translate-x-0 -translate-x-full flex flex-col">
-          <div className="p-3 flex-shrink-0">
-            <img src="https://i.postimg.cc/fTdMBwmQ/hermosa-logo.png" alt="Logo" className="w-50 h-50 mx-auto mb-3" />
-          </div>
-          <nav className="flex flex-col flex-1 overflow-y-auto">
-            <div className="flex-1 pb-4">
-              <Link href="/admin/dashboard" className={`flex items-center px-6 py-3 text-base ${window.location.pathname === '/admin/dashboard' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                <span className="material-symbols-outlined mr-3">dashboard</span>
-                Dashboard
-              </Link>
-              <Link href="/admin/announcement" className={`flex items-center px-6 py-3 text-base ${window.location.pathname === '/admin/announcement' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                <span className="material-symbols-outlined mr-3">campaign</span>
-                Announcement
-              </Link>
-              <Link href="/admin/accounts" className={`flex items-center px-6 py-3 text-base ${window.location.pathname === '/admin/accounts' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                <span className="material-symbols-outlined mr-3">manage_accounts</span>
-                Manage Accounts
-              </Link>
-              <Link href="/admin/rate-management" className={`flex items-center px-6 py-3 text-base ${window.location.pathname === '/admin/rate-management' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                <span className="material-symbols-outlined mr-3">price_change</span>
-                Rate Management
-              </Link>
-              <Link href="/admin/payment" className={`flex items-center px-6 py-3 text-base ${window.location.pathname === '/admin/payment' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                <span className="material-symbols-outlined mr-3">payments</span>
-                Payment
-              </Link>
-              <Link href="/admin/reports" className={`flex items-center px-6 py-3 text-base ${window.location.pathname === '/admin/reports' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                <span className="material-symbols-outlined mr-3">description</span>
-                Reports
-              </Link>
-              <Link href="/admin/tickets" className={`flex items-center px-6 py-3 text-base ${window.location.pathname === '/admin/tickets' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                <span className="material-symbols-outlined mr-3">confirmation_number</span>
-                Tickets
-              </Link>
-              <Link href="/admin/profile" className={`flex items-center px-6 py-3 text-base ${window.location.pathname === '/admin/profile' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}>
-                <span className="material-symbols-outlined mr-3">person</span>
-                Profile
-              </Link>
+    <DynamicTitleLayout userRole={userRole}>
+      <Layout>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
+          <h1 className="text-xl font-semibold">Tickets</h1>
+        </div>
+        {/* Filters Section */}
+        <div className="bg-white rounded-xl shadow-md p-4 mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            {/* Search */}
+            <div className="flex flex-col w-full max-w-[350px] min-w-[200px]">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Search Tickets</label>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by ID or subject..."
+                className="w-full max-w-[350px] min-w-[200px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
-            <div className="flex-shrink-0">
-              <button
-                onClick={async () => {
-                  if (window.confirm('Are you sure you want to log out?')) {
-                    try {
-                      await axios.get('/sanctum/csrf-cookie');
-                      await axios.post('/admin/logout');
-                      window.location.href = '/';
-                    } catch (error) {
-                      window.location.href = '/';
-                    }
-                  }
-                }}
-                className="flex items-center px-6 py-3 text-base text-gray-600 hover:text-red-600 hover:bg-red-50 w-full text-left"
+            {/* Status Filter */}
+            <div className="flex flex-col w-full max-w-[350px] min-w-[200px]">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full max-w-[350px] min-w-[200px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                <span className="material-symbols-outlined mr-3">logout</span>
-                Logout
-              </button>
+                {statusOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          </nav>
-        </div>
-
-        {/* Mobile Header */}
-        <div className="lg:hidden fixed top-0 left-0 right-0 bg-white h-14 flex items-center justify-between px-4 z-20">
-          <button className="text-gray-600 hover:text-gray-800">
-            <span className="material-symbols-outlined">menu</span>
-          </button>
-          <img src="https://i.postimg.cc/fTdMBwmQ/hermosa-logo.png" alt="Logo" className="h-8" />
-          <div></div>
-        </div>
-
-        {/* Main Content */}
-        <div className="lg:ml-[240px] p-3 sm:p-4 md:p-6 lg:p-6 pt-16 lg:pt-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
-            <h1 className="text-xl font-semibold">Tickets</h1>
-          </div>
-
-          {/* Filters Section */}
-          <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Search */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Search Tickets</label>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by ID or subject..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              {/* Status Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  {statusOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Date Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                <DatePicker
-                  selected={dateFilter}
-                  onChange={date => setDateFilter(date)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholderText="Select date"
-                  dateFormat="MMMM d, yyyy"
-                />
-              </div>
+            {/* Date Filter */}
+            <div className="flex flex-col w-full max-w-[350px] min-w-[200px]">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+              <DatePicker
+                selected={dateFilter}
+                onChange={date => setDateFilter(date)}
+                className="w-full max-w-[350px] min-w-[200px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholderText="Select date"
+                dateFormat="MMMM d, yyyy"
+              />
             </div>
           </div>
-
-          {/* Tickets Table */}
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <table className="min-w-full text-sm text-left">
-              <thead>
-                <tr className="border-b">
-                  <th className="py-2 px-4 font-semibold">Ticket ID</th>
-                  <th className="py-2 px-4 font-semibold">Subject</th>
-                  <th className="py-2 px-4 font-semibold">Status</th>
-                  <th className="py-2 px-4 font-semibold">Created</th>
-                  <th className="py-2 px-4 font-semibold">Action</th>
+        </div>
+        {/* Tickets Table */}
+        <div className="bg-white rounded-xl shadow-md p-6">
+          <table className="min-w-full text-sm text-left">
+            <thead>
+              <tr className="border-b">
+                <th className="py-2 px-4 font-semibold min-w-[120px] max-w-[120px]">Ticket ID</th>
+                <th className="py-2 px-4 font-semibold min-w-[200px] max-w-[300px]">Subject</th>
+                <th className="py-2 px-4 font-semibold min-w-[120px] max-w-[160px]">Status</th>
+                <th className="py-2 px-4 font-semibold min-w-[180px] max-w-[200px]">Created</th>
+                <th className="py-2 px-4 font-semibold min-w-[120px] max-w-[140px]">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="5" className="py-4 text-center">
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                      <span className="ml-2">Loading tickets...</span>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan="5" className="py-4 text-center">
-                      <div className="flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                        <span className="ml-2">Loading tickets...</span>
+              ) : filteredTickets.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="py-4 text-center text-gray-500">
+                    No tickets found
+                  </td>
+                </tr>
+              ) : (
+                filteredTickets.map(ticket => (
+                  <tr key={ticket.id} className="border-b hover:bg-blue-50">
+                    <td className="py-2 px-4 min-w-[120px] max-w-[120px]">{ticket.id}</td>
+                    <td className="py-2 px-4 min-w-[200px] max-w-[300px] truncate">{ticket.subject}</td>
+                    <td className="py-2 px-4 min-w-[120px] max-w-[160px]">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          ticket.status === 'open' ? 'bg-green-100 text-green-800' :
+                          ticket.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          ticket.status === 'resolved' ? 'bg-blue-100 text-blue-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
+                        </span>
+                        <button
+                          onClick={() => setViewingRemarks(ticket)}
+                          className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                        >
+                          Ticket Remarks
+                        </button>
                       </div>
                     </td>
-                  </tr>
-                ) : filteredTickets.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="py-4 text-center text-gray-500">
-                      No tickets found
+                    <td className="py-2 px-4 min-w-[180px] max-w-[200px]">{formatDate(ticket.created)}</td>
+                    <td className="py-2 px-4 min-w-[120px] max-w-[140px]">
+                      <button
+                        onClick={() => setViewing(ticket)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                      >
+                        View
+                      </button>
                     </td>
                   </tr>
-                ) : (
-                  filteredTickets.map(ticket => (
-                    <tr key={ticket.id} className="border-b hover:bg-blue-50">
-                      <td className="py-2 px-4">{ticket.id}</td>
-                      <td className="py-2 px-4">{ticket.subject}</td>
-                      <td className="py-2 px-4">
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            ticket.status === 'open' ? 'bg-green-100 text-green-800' :
-                            ticket.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            ticket.status === 'resolved' ? 'bg-blue-100 text-blue-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
-                          </span>
-                          <button
-                            onClick={() => setViewingRemarks(ticket)}
-                            className="text-blue-600 hover:text-blue-800 text-xs font-medium"
-                          >
-                            Ticket Remarks
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-2 px-4">{formatDate(ticket.created)}</td>
-                      <td className="py-2 px-4">
-                        <button
-                          onClick={() => setViewing(ticket)}
-                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                        >
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* View Ticket Modal */}
-          {viewing && (
-            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-                <h2 className="text-xl font-bold mb-4">Ticket #{viewing.id}</h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-                    <p className="text-gray-900">{viewing.subject}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                    <select
-                      value={viewing.status}
-                      onChange={(e) => setViewing({...viewing, status: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      {statusUpdateOptions.map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Created</label>
-                    <p className="text-gray-900">{formatDate(viewing.created)}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Ticket Remarks</label>
-                    <textarea
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                      placeholder="Add remarks about this ticket..."
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      rows="4"
-                    />
-                  </div>
-                </div>
-                <div className="mt-6 flex justify-end space-x-3">
-                  <button
-                    onClick={() => {
-                      setViewing(null);
-                      setRemarks('');
-                    }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => handleStatusUpdate(viewing.id, viewing.status)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    Update Ticket
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* View Remarks Modal */}
-          {viewingRemarks && (
-            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-bold">Ticket #{viewingRemarks.id} Remarks</h2>
-                  <button
-                    onClick={() => setViewingRemarks(null)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    <span className="material-symbols-outlined">close</span>
-                  </button>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-                    <p className="text-gray-900">{viewingRemarks.subject}</p>
-                  </div>
-                  
-                  {/* Remarks History */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Remarks History</label>
-                    <div className="bg-gray-50 rounded-lg divide-y divide-gray-200 max-h-60 overflow-y-auto">
-                      {viewingRemarks.remarksHistory.map((history, index) => (
-                        <div key={history.id} className="p-4">
-                          <div className="flex justify-between items-start mb-2">
-                            <div className="flex items-center">
-                              <span className="text-sm font-medium text-gray-900">{history.user}</span>
-                              <span className="mx-2 text-gray-400">•</span>
-                              <span className="text-sm text-gray-500">{formatDate(history.timestamp)}</span>
-                            </div>
-                          </div>
-                          <p className="text-gray-700 whitespace-pre-wrap">{history.remarks}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Add New Remarks */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Add New Remarks</label>
-                    <textarea
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                      placeholder="Add new remarks..."
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      rows="4"
-                    />
-                  </div>
-                </div>
-                <div className="mt-6 flex justify-end space-x-3">
-                  <button
-                    onClick={() => {
-                      setViewingRemarks(null);
-                      setRemarks('');
-                    }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleStatusUpdate(viewingRemarks.id, viewingRemarks.status);
-                      setViewingRemarks(null);
-                    }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    Update Remarks
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-      </div>
+        {/* View Ticket Modal */}
+        {viewing && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+              <h2 className="text-xl font-bold mb-4">Ticket #{viewing.id}</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                  <p className="text-gray-900">{viewing.subject}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={viewing.status}
+                    onChange={(e) => setViewing({...viewing, status: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {statusUpdateOptions.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Created</label>
+                  <p className="text-gray-900">{formatDate(viewing.created)}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ticket Remarks</label>
+                  <textarea
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    placeholder="Add remarks about this ticket..."
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    rows="4"
+                  />
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setViewing(null);
+                    setRemarks('');
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleStatusUpdate(viewing.id, viewing.status)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Update Ticket
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* View Remarks Modal */}
+        {viewingRemarks && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">Ticket #{viewingRemarks.id} Remarks</h2>
+                <button
+                  onClick={() => setViewingRemarks(null)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                  <p className="text-gray-900">{viewingRemarks.subject}</p>
+                </div>
+                
+                {/* Remarks History */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Remarks History</label>
+                  <div className="bg-gray-50 rounded-lg divide-y divide-gray-200 max-h-60 overflow-y-auto">
+                    {viewingRemarks.remarksHistory.map((history, index) => (
+                      <div key={history.id} className="p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex items-center">
+                            <span className="text-sm font-medium text-gray-900">{history.user}</span>
+                            <span className="mx-2 text-gray-400">•</span>
+                            <span className="text-sm text-gray-500">{formatDate(history.timestamp)}</span>
+                          </div>
+                        </div>
+                        <p className="text-gray-700 whitespace-pre-wrap">{history.remarks}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Add New Remarks */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Add New Remarks</label>
+                  <textarea
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    placeholder="Add new remarks..."
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    rows="4"
+                  />
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setViewingRemarks(null);
+                    setRemarks('');
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    handleStatusUpdate(viewingRemarks.id, viewingRemarks.status);
+                    setViewingRemarks(null);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Update Remarks
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Layout>
     </DynamicTitleLayout>
   );
 };

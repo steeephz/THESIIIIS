@@ -79,6 +79,21 @@ Route::middleware(['auth:sanctum', 'web'])->group(function () {
     Route::get('/bill-handler/dashboard', function () {
         return Inertia::render('BillHandlerDashboard');
     })->name('bill-handler.dashboard');
+
+    // Bill Handler Tickets (sync with admin tickets)
+    Route::get('/bill-handler/tickets', function () {
+        return Inertia::render('Tickets');
+    })->name('bill-handler.tickets');
+
+    // Bill Handler Billing
+    Route::get('/bill-handler/billing', function () {
+        return Inertia::render('BillHandlerBilling');
+    })->name('bill-handler.billing');
+
+    // Bill Handler Customers
+    Route::get('/bill-handler/customers', function () {
+        return Inertia::render('BillHandlerCustomers');
+    })->name('bill-handler.customers');
 });
 
 require __DIR__.'/auth.php';
