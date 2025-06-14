@@ -49,6 +49,53 @@ const Accounts = () => {
     });
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
+    // Add validation state
+    const [formErrors, setFormErrors] = useState({
+        name: '',
+        username: '',
+        account_number: '',
+        meter_number: '',
+        address: '',
+        email: '',
+        contact_number: ''
+    });
+
+    // Add validation functions
+    const validateName = (name) => {
+        return /^[A-Za-z\s]+$/.test(name);
+    };
+
+    const validateUsername = (username) => {
+        return /^[A-Za-z0-9]+$/.test(username);
+    };
+
+    const validateAccountNumber = (accountNumber) => {
+        return /^\d{2}-\d{6}$/.test(accountNumber) && accountNumber.length === 9;
+    };
+
+    const validateContactNumber = (contactNumber) => {
+        return /^\d{11}$/.test(contactNumber);
+    };
+
+    const validateMeterNumber = (meterNumber) => {
+        return /^\d{9}$/.test(meterNumber);
+    };
+
+    const validateAddress = (address) => {
+        return /^[A-Za-z0-9\s,.-]+$/.test(address);
+    };
+
+    const validateEmail = (email) => {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    };
+
+    // Add password validation function
+    const validatePassword = (password) => {
+        const hasNumber = /\d/.test(password);
+        const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+        return hasNumber && hasSpecialChar;
+    };
+
     // Filter accounts based on active tab and search term
     const filteredAccounts = useMemo(() => {
         console.log('Current accounts:', accounts);
@@ -107,6 +154,56 @@ const Accounts = () => {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
+        let error = '';
+
+        switch (name) {
+            case 'name':
+                if (!validateName(value)) {
+                    error = 'Name should only contain letters';
+                }
+                break;
+            case 'username':
+                if (!validateUsername(value)) {
+                    error = 'Username should not contain spaces or special characters';
+                }
+                break;
+            case 'password':
+                if (!validatePassword(value)) {
+                    error = 'Password must contain at least one number and one special character';
+                }
+                break;
+            case 'account_number':
+                if (!validateAccountNumber(value)) {
+                    error = 'Account number should be in format XX-XXXXXX (9 characters)';
+                }
+                break;
+            case 'contact_number':
+                if (!validateContactNumber(value)) {
+                    error = 'Contact number should be 11 digits';
+                }
+                break;
+            case 'meter_number':
+                if (!validateMeterNumber(value)) {
+                    error = 'Meter number should be 9 digits';
+                }
+                break;
+            case 'address':
+                if (!validateAddress(value)) {
+                    error = 'Address should not contain special characters';
+                }
+                break;
+            case 'email':
+                if (!validateEmail(value)) {
+                    error = 'Please enter a valid email address';
+                }
+                break;
+        }
+
+        setFormErrors(prev => ({
+            ...prev,
+            [name]: error
+        }));
+
         setFormData(prev => ({
             ...prev,
             [name]: value
@@ -169,6 +266,50 @@ const Accounts = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // Validate all fields before submission
+        const errors = {};
+        
+        // Always validate these fields
+        if (!validateName(formData.name)) {
+            errors.name = 'Name should only contain letters';
+        }
+        if (!validateUsername(formData.username)) {
+            errors.username = 'Username should not contain spaces or special characters';
+        }
+        if (!validateEmail(formData.email)) {
+            errors.email = 'Please enter a valid email address';
+        }
+        if (!validateAddress(formData.address)) {
+            errors.address = 'Address should not contain special characters';
+        }
+        if (!validateContactNumber(formData.contact_number)) {
+            errors.contact_number = 'Contact number should be 11 digits';
+        }
+
+        // Only validate customer-specific fields if it's a customer form
+        if (formType === 'customer') {
+            if (!validateAccountNumber(formData.account_number)) {
+                errors.account_number = 'Account number should be in format XX-XXXXXX (9 characters)';
+            }
+            if (!validateMeterNumber(formData.meter_number)) {
+                errors.meter_number = 'Meter number should be 9 digits';
+            }
+        }
+
+        // Only validate password for new accounts
+        if (!editingAccount && !validatePassword(formData.password)) {
+            errors.password = 'Password must contain at least one number and one special character';
+        }
+
+        setFormErrors(errors);
+
+        // Check if there are any errors
+        if (Object.keys(errors).length > 0) {
+            showNotification('Please fix the form errors before submitting', 'error');
+            return;
+        }
+
         try {
             let response;
             
@@ -183,7 +324,6 @@ const Accounts = () => {
                 const customerData = {
                     name: formData.name,
                     username: formData.username,
-                    password: formData.password,
                     customer_type: formData.customer_type,
                     address: formData.address,
                     contact_number: formData.contact_number,
@@ -191,6 +331,11 @@ const Accounts = () => {
                     account_number: formData.account_number,
                     meter_number: formData.meter_number
                 };
+
+                // Only include password for new accounts
+                if (!editingAccount) {
+                    customerData.password = formData.password;
+                }
                 
                 if (editingAccount) {
                     response = await axios.put(`/api/accounts/customer/${editingAccount.id}`, customerData);
@@ -214,6 +359,7 @@ const Accounts = () => {
                     account_number: '',
                     meter_number: ''
                 });
+                setFormErrors({});
                 fetchAccounts();
                 showNotification(formType === 'staff' 
                     ? (editingAccount ? 'Staff account updated successfully!' : 'Staff account created successfully!')
@@ -326,8 +472,13 @@ const Accounts = () => {
                                             name="name"
                                             value={formData.name}
                                             onChange={handleInputChange}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                            className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                                                formErrors.name ? 'border-red-500' : 'border-gray-300'
+                                            }`}
                                         />
+                                        {formErrors.name && (
+                                            <p className="mt-1 text-sm text-red-600">{formErrors.name}</p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700">
@@ -353,8 +504,15 @@ const Accounts = () => {
                                             name="account_number"
                                             value={formData.account_number}
                                             onChange={handleInputChange}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                            maxLength="9"
+                                            placeholder="XX-XXXXXX"
+                                            className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                                                formErrors.account_number ? 'border-red-500' : 'border-gray-300'
+                                            }`}
                                         />
+                                        {formErrors.account_number && (
+                                            <p className="mt-1 text-sm text-red-600">{formErrors.account_number}</p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700">
@@ -365,8 +523,14 @@ const Accounts = () => {
                                             name="meter_number"
                                             value={formData.meter_number}
                                             onChange={handleInputChange}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                            maxLength="9"
+                                            className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                                                formErrors.meter_number ? 'border-red-500' : 'border-gray-300'
+                                            }`}
                                         />
+                                        {formErrors.meter_number && (
+                                            <p className="mt-1 text-sm text-red-600">{formErrors.meter_number}</p>
+                                        )}
                                     </div>
                                 </>
                             )}
@@ -379,8 +543,13 @@ const Accounts = () => {
                                     name="username"
                                     value={formData.username}
                                     onChange={handleInputChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                    className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                                        formErrors.username ? 'border-red-500' : 'border-gray-300'
+                                    }`}
                                 />
+                                {formErrors.username && (
+                                    <p className="mt-1 text-sm text-red-600">{formErrors.username}</p>
+                                )}
                             </div>
                             {!editingAccount && (
                                 <div>
@@ -393,7 +562,9 @@ const Accounts = () => {
                                             name="password"
                                             value={formData.password}
                                             onChange={handleInputChange}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                            className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                                                formErrors.password ? 'border-red-500' : 'border-gray-300'
+                                            }`}
                                         />
                                         <button
                                             type="button"
@@ -405,6 +576,9 @@ const Accounts = () => {
                                             </span>
                                         </button>
                                     </div>
+                                    {formErrors.password && (
+                                        <p className="mt-1 text-sm text-red-600">{formErrors.password}</p>
+                                    )}
                                 </div>
                             )}
                             <div>
@@ -416,8 +590,15 @@ const Accounts = () => {
                                     name="contact_number"
                                     value={formData.contact_number}
                                     onChange={handleInputChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                    maxLength="11"
+                                    placeholder="Enter 11 digits"
+                                    className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                                        formErrors.contact_number ? 'border-red-500' : 'border-gray-300'
+                                    }`}
                                 />
+                                {formErrors.contact_number && (
+                                    <p className="mt-1 text-sm text-red-600">{formErrors.contact_number}</p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">
@@ -428,8 +609,13 @@ const Accounts = () => {
                                     name="email"
                                     value={formData.email}
                                     onChange={handleInputChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                    className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                                        formErrors.email ? 'border-red-500' : 'border-gray-300'
+                                    }`}
                                 />
+                                {formErrors.email && (
+                                    <p className="mt-1 text-sm text-red-600">{formErrors.email}</p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">
@@ -440,8 +626,13 @@ const Accounts = () => {
                                     name="address"
                                     value={formData.address}
                                     onChange={handleInputChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                    className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                                        formErrors.address ? 'border-red-500' : 'border-gray-300'
+                                    }`}
                                 />
+                                {formErrors.address && (
+                                    <p className="mt-1 text-sm text-red-600">{formErrors.address}</p>
+                                )}
                             </div>
                         </div>
                         <div className="flex justify-end space-x-3 mt-6">
