@@ -6,6 +6,7 @@ import BillHandlerLayout from '@/Layouts/BillHandlerLayout';
 import AdminLayout from '@/Layouts/AdminLayout';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
+import Notification from '@/Components/Notification';
 
 const statusOptions = [
   { label: 'All Status', value: 'all' },
@@ -22,108 +23,6 @@ const statusUpdateOptions = [
   { label: 'Closed', value: 'closed' }
 ];
 
-const initialTickets = [
-  {
-    id: 1001,
-    subject: 'Water Pressure Issue',
-    status: 'open',
-    created: '2024-03-20T09:30:00',
-    remarks: 'Customer reported low water pressure in the morning',
-    remarksHistory: [
-      {
-        id: 1,
-        remarks: 'Customer reported low water pressure in the morning',
-        timestamp: '2024-03-20T09:30:00',
-        user: 'Admin User'
-      }
-    ]
-  },
-  {
-    id: 1002,
-    subject: 'Billing Dispute',
-    status: 'pending',
-    created: '2024-03-19T14:15:00',
-    remarks: 'Customer questioning unusually high bill amount',
-    remarksHistory: [
-      {
-        id: 1,
-        remarks: 'Initial complaint received',
-        timestamp: '2024-03-19T14:15:00',
-        user: 'Admin User'
-      },
-      {
-        id: 2,
-        remarks: 'Customer questioning unusually high bill amount',
-        timestamp: '2024-03-19T15:30:00',
-        user: 'Support Staff'
-      }
-    ]
-  },
-  {
-    id: 1003,
-    subject: 'Meter Reading Request',
-    status: 'resolved',
-    created: '2024-03-18T11:45:00',
-    remarks: 'Customer requested manual meter reading verification',
-    remarksHistory: [
-      {
-        id: 1,
-        remarks: 'Customer requested manual meter reading verification',
-        timestamp: '2024-03-18T11:45:00',
-        user: 'Admin User'
-      },
-      {
-        id: 2,
-        remarks: 'Meter reading verified and updated in system',
-        timestamp: '2024-03-18T14:20:00',
-        user: 'Technical Staff'
-      }
-    ]
-  },
-  {
-    id: 1004,
-    subject: 'Leak Report',
-    status: 'closed',
-    created: '2024-03-17T16:20:00',
-    remarks: 'Major leak in main water line, emergency repair completed',
-    remarksHistory: [
-      {
-        id: 1,
-        remarks: 'Emergency leak reported',
-        timestamp: '2024-03-17T16:20:00',
-        user: 'Admin User'
-      },
-      {
-        id: 2,
-        remarks: 'Repair team dispatched',
-        timestamp: '2024-03-17T16:45:00',
-        user: 'Support Staff'
-      },
-      {
-        id: 3,
-        remarks: 'Major leak in main water line, emergency repair completed',
-        timestamp: '2024-03-17T18:30:00',
-        user: 'Technical Staff'
-      }
-    ]
-  },
-  {
-    id: 1005,
-    subject: 'Service Reconnection',
-    status: 'open',
-    created: '2024-03-16T10:00:00',
-    remarks: 'Customer requesting service reconnection after payment',
-    remarksHistory: [
-      {
-        id: 1,
-        remarks: 'Customer requesting service reconnection after payment',
-        timestamp: '2024-03-16T10:00:00',
-        user: 'Admin User'
-      }
-    ]
-  }
-];
-
 const formatDate = (dateString) => {
   const date = new Date(dateString);
   return date.toLocaleDateString('en-US', {
@@ -136,8 +35,8 @@ const formatDate = (dateString) => {
 };
 
 const Tickets = () => {
-  const [tickets, setTickets] = useState(initialTickets);
-  const [filteredTickets, setFilteredTickets] = useState(initialTickets);
+  const [tickets, setTickets] = useState([]);
+  const [filteredTickets, setFilteredTickets] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState(null);
@@ -145,11 +44,29 @@ const Tickets = () => {
   const [remarks, setRemarks] = useState('');
   const [loading, setLoading] = useState(false);
   const [viewingRemarks, setViewingRemarks] = useState(null);
+  const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
 
   // Determine layout based on path
   const isBillHandler = typeof window !== 'undefined' && window.location.pathname.startsWith('/bill-handler');
   const Layout = isBillHandler ? BillHandlerLayout : AdminLayout;
   const userRole = isBillHandler ? 'bill handler' : 'admin';
+
+  useEffect(() => {
+    const fetchTickets = async () => {
+      setLoading(true);
+      try {
+        const response = await axios.get('/api/tickets');
+        if (response.data.success) {
+          setTickets(response.data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching tickets:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTickets();
+  }, []);
 
   useEffect(() => {
     let filtered = [...tickets];
@@ -181,31 +98,44 @@ const Tickets = () => {
     setFilteredTickets(filtered);
   }, [searchQuery, statusFilter, dateFilter, tickets]);
 
-  const handleStatusUpdate = (ticketId, newStatus) => {
-    const updatedTickets = tickets.map(ticket => {
-      if (ticket.id === ticketId) {
-        const newRemarksHistory = [
-          ...ticket.remarksHistory,
-          {
-            id: ticket.remarksHistory.length + 1,
-            remarks: remarks || ticket.remarks,
-            timestamp: new Date().toISOString(),
-            user: 'Admin User' // This should be replaced with actual logged-in user
+  const handleStatusUpdate = async (ticketId, newStatus) => {
+    // Only proceed if remarks field is not empty
+    if (!remarks.trim()) {
+      setNotification({ show: true, message: 'Please enter a new remark before updating.', type: 'error' });
+      return;
+    }
+    try {
+      const response = await axios.patch(`/api/tickets/${ticketId}`, {
+        status: newStatus,
+        remarks: remarks
+      });
+      if (response.data.success) {
+        const updatedTickets = tickets.map(ticket => {
+          if (ticket.id === ticketId) {
+            return response.data.data; // Use the updated ticket data from the response
           }
-        ];
-        return {
-          ...ticket,
-          status: newStatus,
-          remarks: remarks || ticket.remarks,
-          remarksHistory: newRemarksHistory
-        };
+          return ticket;
+        });
+        setTickets(updatedTickets);
+        setViewing(null);
+        setRemarks('');
+        setNotification({ show: true, message: 'Ticket updated successfully!', type: 'success' });
       }
-      return ticket;
-    });
-    setTickets(updatedTickets);
-    setViewing(null);
-    setRemarks('');
+    } catch (error) {
+      console.error('Error updating ticket:', error);
+      setNotification({ show: true, message: 'Failed to update ticket.', type: 'error' });
+    }
   };
+
+  // Auto-hide notification after 3 seconds
+  useEffect(() => {
+    if (notification.show) {
+      const timer = setTimeout(() => {
+        setNotification(prev => ({ ...prev, show: false }));
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification.show]);
 
   return (
     <DynamicTitleLayout userRole={userRole}>
@@ -264,13 +194,14 @@ const Tickets = () => {
                 <th className="py-2 px-4 font-semibold min-w-[200px] max-w-[300px]">Subject</th>
                 <th className="py-2 px-4 font-semibold min-w-[120px] max-w-[160px]">Status</th>
                 <th className="py-2 px-4 font-semibold min-w-[180px] max-w-[200px]">Created</th>
+                <th className="py-2 px-4 font-semibold min-w-[180px] max-w-[200px]">Last Updated</th>
                 <th className="py-2 px-4 font-semibold min-w-[120px] max-w-[140px]">Action</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="py-4 text-center">
+                  <td colSpan="6" className="py-4 text-center">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
                       <span className="ml-2">Loading tickets...</span>
@@ -279,7 +210,7 @@ const Tickets = () => {
                 </tr>
               ) : filteredTickets.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="py-4 text-center text-gray-500">
+                  <td colSpan="6" className="py-4 text-center text-gray-500">
                     No tickets found
                   </td>
                 </tr>
@@ -307,6 +238,7 @@ const Tickets = () => {
                       </div>
                     </td>
                     <td className="py-2 px-4 min-w-[180px] max-w-[200px]">{formatDate(ticket.created)}</td>
+                    <td className="py-2 px-4 min-w-[180px] max-w-[200px]">{formatDate(ticket.updated)}</td>
                     <td className="py-2 px-4 min-w-[120px] max-w-[140px]">
                       <button
                         onClick={() => setViewing(ticket)}
@@ -324,19 +256,29 @@ const Tickets = () => {
         {/* View Ticket Modal */}
         {viewing && (
           <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-              <h2 className="text-xl font-bold mb-4">Ticket #{viewing.id}</h2>
+            <div className="bg-white rounded-xl p-10 w-full max-w-4xl min-w-[700px]">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Ticket Details</h2>
+                <button
+                  onClick={() => setViewing(null)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-                  <p className="text-gray-900">{viewing.subject}</p>
+                  <label className="block text-sm font-medium text-gray-700">Subject</label>
+                  <p className="mt-1 text-gray-900">{viewing.subject}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <label className="block text-sm font-medium text-gray-700">Status</label>
                   <select
                     value={viewing.status}
-                    onChange={(e) => setViewing({...viewing, status: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    onChange={(e) => handleStatusUpdate(viewing.id, e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   >
                     {statusUpdateOptions.map(option => (
                       <option key={option.value} value={option.value}>
@@ -346,36 +288,50 @@ const Tickets = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Created</label>
-                  <p className="text-gray-900">{formatDate(viewing.created)}</p>
+                  <label className="block text-sm font-medium text-gray-700">Remarks History</label>
+                  <div className="space-y-3 max-h-60 overflow-y-auto">
+                    {viewing.remarksHistory.slice().reverse().map((history) => (
+                      <div key={history.id} className="bg-gray-50 p-3 rounded-lg">
+                        <div className="flex justify-between items-start">
+                          <span className="font-semibold text-sm text-gray-800">{history.user}</span>
+                          <span className="text-xs text-gray-500">{formatDate(history.timestamp)}</span>
+                        </div>
+                        <p className="text-sm text-gray-900 mt-1">{history.remarks}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Ticket Remarks</label>
+                  <label className="block text-sm font-medium text-gray-700">Add New Remarks</label>
                   <textarea
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
-                    placeholder="Add remarks about this ticket..."
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    rows="4"
+                    placeholder="Add new remarks..."
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    rows="3"
                   />
                 </div>
-              </div>
-              <div className="mt-6 flex justify-end space-x-3">
-                <button
-                  onClick={() => {
-                    setViewing(null);
-                    setRemarks('');
-                  }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleStatusUpdate(viewing.id, viewing.status)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  Update Ticket
-                </button>
+                <div className="mt-6 flex justify-end space-x-3">
+                  <button
+                    onClick={() => {
+                      setViewing(null);
+                      setRemarks('');
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleStatusUpdate(viewing.id, viewing.status)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    Update Remarks
+                  </button>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Current Remarks</label>
+                  <p className="mt-1 text-gray-900">{viewing.remarks}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -384,7 +340,7 @@ const Tickets = () => {
         {/* View Remarks Modal */}
         {viewingRemarks && (
           <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl">
+            <div className="bg-white rounded-xl p-10 w-full max-w-4xl min-w-[700px] h-[600px]">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold">Ticket #{viewingRemarks.id} Remarks</h2>
                 <button
@@ -399,12 +355,11 @@ const Tickets = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
                   <p className="text-gray-900">{viewingRemarks.subject}</p>
                 </div>
-                
                 {/* Remarks History */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Remarks History</label>
-                  <div className="bg-gray-50 rounded-lg divide-y divide-gray-200 max-h-60 overflow-y-auto">
-                    {viewingRemarks.remarksHistory.map((history, index) => (
+                  <div className="bg-gray-50 rounded-lg divide-y divide-gray-200 max-h-[400px] overflow-y-auto">
+                    {viewingRemarks.remarksHistory.slice().reverse().map((history, index) => (
                       <div key={history.id} className="p-4">
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex items-center">
@@ -418,41 +373,16 @@ const Tickets = () => {
                     ))}
                   </div>
                 </div>
-
-                {/* Add New Remarks */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Add New Remarks</label>
-                  <textarea
-                    value={remarks}
-                    onChange={(e) => setRemarks(e.target.value)}
-                    placeholder="Add new remarks..."
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    rows="4"
-                  />
-                </div>
-              </div>
-              <div className="mt-6 flex justify-end space-x-3">
-                <button
-                  onClick={() => {
-                    setViewingRemarks(null);
-                    setRemarks('');
-                  }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    handleStatusUpdate(viewingRemarks.id, viewingRemarks.status);
-                    setViewingRemarks(null);
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  Update Remarks
-                </button>
               </div>
             </div>
           </div>
+        )}
+        {notification.show && (
+          <Notification
+            message={notification.message}
+            type={notification.type}
+            onClose={() => setNotification({ ...notification, show: false })}
+          />
         )}
       </Layout>
     </DynamicTitleLayout>

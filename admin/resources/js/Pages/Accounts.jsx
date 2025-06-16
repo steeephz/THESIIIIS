@@ -48,6 +48,7 @@ const Accounts = () => {
         type: null
     });
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+    const [customerTypeFilter, setCustomerTypeFilter] = useState('all');
 
     // Add validation state
     const [formErrors, setFormErrors] = useState({
@@ -98,24 +99,22 @@ const Accounts = () => {
 
     // Filter accounts based on active tab and search term
     const filteredAccounts = useMemo(() => {
-        console.log('Current accounts:', accounts);
-        console.log('Active tab:', activeTab);
-        
         return accounts.filter(account => {
-            console.log('Checking account:', account);
             const matchesSearch = searchTerm === '' || 
                 account.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 account.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 account.email?.toLowerCase().includes(searchTerm.toLowerCase());
-
-            if (activeTab === 'all') return matchesSearch; // Show all accounts
+            if (activeTab === 'customer') {
+                const matchesType = customerTypeFilter === 'all' || (account.customer_type && account.customer_type.toLowerCase() === customerTypeFilter);
+                return account.type?.toLowerCase() === 'customer' && matchesSearch && matchesType;
+            }
+            if (activeTab === 'all') return matchesSearch;
             if (activeTab === 'admin') return account.role?.toLowerCase() === 'admin' && matchesSearch;
             if (activeTab === 'meter handler') return account.role?.toLowerCase() === 'meter handler' && matchesSearch;
             if (activeTab === 'bill handler') return account.role?.toLowerCase() === 'bill handler' && matchesSearch;
-            if (activeTab === 'customer') return account.type?.toLowerCase() === 'customer' && matchesSearch;
             return false;
         });
-    }, [accounts, activeTab, searchTerm]);
+    }, [accounts, activeTab, searchTerm, customerTypeFilter]);
 
     useEffect(() => {
         const fetchProfileData = async () => {
@@ -718,17 +717,31 @@ const Accounts = () => {
 
                 {/* Search Input */}
                 <div className="bg-white rounded-xl shadow-md p-4 mb-6">
-                    <div className="relative">
-                        <input
-                            type="text"
-                            placeholder="Search accounts..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                        <span className="material-symbols-outlined absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                            search
-                        </span>
+                    <div className="flex flex-col md:flex-row md:items-center gap-2">
+                        <div className="relative w-full md:w-auto flex-1">
+                            <input
+                                type="text"
+                                placeholder="Search accounts..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                            <span className="material-symbols-outlined absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                                search
+                            </span>
+                        </div>
+                        {activeTab === 'customer' && (
+                            <select
+                                value={customerTypeFilter}
+                                onChange={e => setCustomerTypeFilter(e.target.value)}
+                                className="border border-gray-300 rounded-lg px-3 py-2 text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[180px]"
+                            >
+                                <option value="all">All Types</option>
+                                <option value="commercial">Commercial</option>
+                                <option value="residential">Residential</option>
+                                <option value="government">Government</option>
+                            </select>
+                        )}
                     </div>
                 </div>
 

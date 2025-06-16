@@ -21,7 +21,10 @@ return new class extends Migration
             'name' => 'Super Admin',
             'username' => 'superadmin',
             'password' => Hash::make('superadmin'),
-            'role' => 'superadmin',
+            'role' => 'admin',
+            'address' => 'Hermosa Water District',
+            'contact_number' => '+639090909090',
+            'email' => 'superadmin@hermosa.com',
             'created_at' => now(),
             'updated_at' => now(),
         ]);

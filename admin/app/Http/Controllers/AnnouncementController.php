@@ -48,7 +48,18 @@ class AnnouncementController extends Controller
 
         try {
             $staff = Auth::user();
-            
+            if (!$staff) {
+                return response()->json([
+                    'message' => 'Not authenticated as staff.',
+                    'success' => false
+                ], 401);
+            }
+            if (!isset($staff->id) || !isset($staff->name)) {
+                return response()->json([
+                    'message' => 'Staff user missing id or name.',
+                    'success' => false
+                ], 400);
+            }
             DB::table('announcements_tb')->insert([
                 'title' => $request->title,
                 'body' => $request->content,
@@ -68,6 +79,7 @@ class AnnouncementController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Failed to create announcement',
+                'error' => $e->getMessage(),
                 'success' => false
             ], 500);
         }

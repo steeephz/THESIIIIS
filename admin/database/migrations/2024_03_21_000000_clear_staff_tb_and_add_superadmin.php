@@ -19,8 +19,13 @@ return new class extends Migration
         // Insert superadmin account
         DB::table('staff_tb')->insert([
             [
+                'name' => 'Super Admin',
                 'username' => 'superadmin',
                 'password' => Hash::make('superadmin123!'),
+                'role' => 'admin',
+                'address' => 'Hermosa Water District',
+                'contact_number' => '+639090909090',
+                'email' => 'superadmin@hermosa.com',
                 'created_at' => now(),
                 'updated_at' => now()
             ]

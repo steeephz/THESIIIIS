@@ -11,6 +11,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\RateController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\TicketController;
 
 /*
 |--------------------------------------------------------------------------
@@ -75,6 +76,12 @@ Route::middleware(['auth:sanctum', 'web'])->group(function () {
         Route::get('/', [PaymentController::class, 'index']);
         Route::post('/', [PaymentController::class, 'store']);
         Route::post('/{id}/approve', [PaymentController::class, 'approve']);
+    });
+
+    // Ticket Routes
+    Route::prefix('tickets')->group(function () {
+        Route::get('/', [TicketController::class, 'index']);
+        Route::patch('/{id}', [TicketController::class, 'update']);
     });
 });
 
