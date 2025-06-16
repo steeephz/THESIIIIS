@@ -19,7 +19,12 @@ const Announcement = () => {
   const { auth } = usePage().props;
   const [profilePicture, setProfilePicture] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
-  const [form, setForm] = useState({ title: '', content: '', start_date: '', end_date: '' });
+  const [form, setForm] = useState({ 
+    title: '', 
+    content: '', 
+    start_date: new Date().toISOString().split('T')[0], 
+    end_date: '' 
+  });
   const [editingId, setEditingId] = useState(null);
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -78,28 +83,16 @@ const Announcement = () => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const validateDuration = (start, end) => {
-    if (!start || !end) return true;
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    const maxEnd = new Date(startDate);
-    maxEnd.setMonth(maxEnd.getMonth() + 1);
-    return endDate <= maxEnd;
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateDuration(form.start_date, form.end_date)) {
-      showNotification('End date must not be more than 1 month after start date', 'error');
-      return;
-    }
+    const currentDate = new Date().toISOString().split('T')[0];
 
     try {
       if (editingId) {
         await axios.put(`/api/announcements/${editingId}`, {
           title: form.title,
           content: form.content,
-          start_date: form.start_date,
+          start_date: currentDate,
           end_date: form.end_date
         });
         showNotification('Announcement updated successfully');
@@ -107,13 +100,13 @@ const Announcement = () => {
         await axios.post('/api/announcements', {
           title: form.title,
           content: form.content,
-          start_date: form.start_date,
+          start_date: currentDate,
           end_date: form.end_date
         });
         showNotification('Announcement created successfully');
       }
       fetchAnnouncements();
-      setForm({ title: '', content: '', start_date: '', end_date: '' });
+      setForm({ title: '', content: '', end_date: '' });
       setEditingId(null);
       setShowCreateModal(false);
     } catch (error) {
@@ -321,29 +314,16 @@ const Announcement = () => {
                       required
                     />
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                      <input
-                        type="date"
-                        name="start_date"
-                        value={form.start_date}
-                        onChange={handleChange}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-                      <input
-                        type="date"
-                        name="end_date"
-                        value={form.end_date}
-                        onChange={handleChange}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                        required
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                    <input
+                      type="date"
+                      name="end_date"
+                      value={form.end_date}
+                      onChange={handleChange}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                      required
+                    />
                   </div>
                   <div className="flex justify-end gap-2 mt-6">
                     <button
