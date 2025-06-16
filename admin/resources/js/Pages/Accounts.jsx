@@ -755,7 +755,7 @@ const Accounts = () => {
                                         <>
                                             <th className="py-3 px-4 font-semibold">Name</th>
                                             <th className="py-3 px-4 font-semibold">Username</th>
-                                            <th className="py-3 px-4 font-semibold">Customer Type</th>
+                                            <th className="py-3 px-4 font-semibold">Type</th>
                                             <th className="py-3 px-4 font-semibold">Address</th>
                                             <th className="py-3 px-4 font-semibold">Contact Number</th>
                                             <th className="py-3 px-4 font-semibold">Email</th>
@@ -767,7 +767,7 @@ const Accounts = () => {
                                         <>
                                             <th className="py-3 px-4 font-semibold">Name</th>
                                             <th className="py-3 px-4 font-semibold">Username</th>
-                                            <th className="py-3 px-4 font-semibold">Role</th>
+                                            <th className="py-3 px-4 font-semibold">Role/Type</th>
                                             <th className="py-3 px-4 font-semibold">Address</th>
                                             <th className="py-3 px-4 font-semibold">Contact Number</th>
                                             <th className="py-3 px-4 font-semibold">Email</th>
@@ -810,7 +810,9 @@ const Accounts = () => {
                                             <>
                                                 <td className="py-3 px-4">{account.name}</td>
                                                 <td className="py-3 px-4">{account.username}</td>
-                                                <td className="py-3 px-4">{account.role}</td>
+                                                <td className="py-3 px-4">
+                                                    {account.type === 'customer' ? account.customer_type : account.role}
+                                                </td>
                                                 <td className="py-3 px-4">{account.address}</td>
                                                 <td className="py-3 px-4">{account.contact_number}</td>
                                                 <td className="py-3 px-4">{account.email}</td>
