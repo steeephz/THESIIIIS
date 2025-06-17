@@ -12,6 +12,7 @@ use App\Http\Controllers\RateController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\TicketController;
+use App\Http\Controllers\BillPaymentValidationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -83,6 +84,10 @@ Route::middleware(['auth:sanctum', 'web'])->group(function () {
         Route::get('/', [TicketController::class, 'index']);
         Route::patch('/{id}', [TicketController::class, 'update']);
     });
+
+    // Bill Payment Validation Routes
+    Route::get('/bill-payment-validation', [BillPaymentValidationController::class, 'index']);
+    Route::patch('/bill-payment-validation/{id}/status', [BillPaymentValidationController::class, 'updateStatus']);
 });
 
 // Temporary debug route

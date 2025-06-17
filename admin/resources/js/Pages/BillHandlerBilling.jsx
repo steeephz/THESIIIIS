@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import BillHandlerLayout from '@/Layouts/BillHandlerLayout';
 import DynamicTitleLayout from '@/Layouts/DynamicTitleLayout';
 import dayjs from 'dayjs';
@@ -24,13 +24,6 @@ const billingFeatures = [
     title: 'Billing History',
     description: 'Track all generated bills by date/period',
   },
-];
-
-const mockBills = [
-  { id: 1, customer: 'John Doe', accountNumber: '12001234', accountType: 'Residential', period: '2024-06', amount: 500, status: 'Pending Validation', paymentDate: '2024-06-10', paymentMethod: 'Online', reference: 'PMI1234567' },
-  { id: 2, customer: 'Jane Smith', accountNumber: '23004567', accountType: 'Commercial', period: '2024-06', amount: 1500, status: 'Unpaid', paymentDate: '', paymentMethod: '', reference: '' },
-  { id: 3, customer: 'Gov Office', accountNumber: '31006789', accountType: 'Government', period: '2024-06', amount: 800, status: 'Confirmed', paymentDate: '2024-06-09', paymentMethod: 'Cash', reference: 'PMI7654321' },
-  { id: 4, customer: 'Mary Ann', accountNumber: '45001234', accountType: 'Residential', period: '2024-06', amount: 700, status: 'Rejected', paymentDate: '2024-06-08', paymentMethod: 'Online', reference: 'PMI1111222' },
 ];
 
 const mockCycles = [
@@ -197,7 +190,8 @@ const BillHandlerBilling = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [billingPeriod, setBillingPeriod] = useState('2024-06');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [bills, setBills] = useState(mockBills);
+  const [bills, setBills] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const [cycleAccountType, setCycleAccountType] = useState('All');
   const [cyclePeriod, setCyclePeriod] = useState('2024-06');
@@ -223,14 +217,52 @@ const BillHandlerBilling = () => {
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
+  const [showBillDetailsModal, setShowBillDetailsModal] = useState(false);
+  const [selectedBill, setSelectedBill] = useState(null);
+
+  const [showCycleDetailsModal, setShowCycleDetailsModal] = useState(false);
+
   const currentFeature = billingFeatures.find(f => f.key === activeTab);
+
+  // Fetch bills from API (moved outside useEffect for reuse)
+  const fetchBills = async () => {
+    setLoading(true);
+    try {
+      let url = '/api/bill-payment-validation?';
+      url += `account_type=${accountType}&status=${statusFilter}&period=${billingPeriod}&search=${searchTerm}`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        setBills(Array.isArray(data) ? data : []);
+      } else {
+        setBills([]);
+      }
+    } catch (err) {
+      setBills([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBills();
+    // eslint-disable-next-line
+  }, [accountType, statusFilter, billingPeriod, searchTerm]);
+
+  // Defensive rendering for bills
+  if (loading) {
+    return <div className="w-full text-center py-10 text-lg font-semibold text-blue-600">Loading billing data...</div>;
+  }
+  if (!Array.isArray(bills)) {
+    return <div>Error: Bills data is not an array.</div>;
+  }
 
   // Filter bills based on account type, search, period, and status
   const filteredBills = bills.filter(bill => {
-    const matchesType = accountType === 'All' || bill.accountType === accountType;
+    const matchesType = accountType === 'All' || bill.account_type === accountType;
     const matchesSearch =
       bill.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      formatAccountNumber(bill.accountNumber).includes(searchTerm);
+      formatAccountNumber(bill.account_number).includes(searchTerm);
     const matchesStatus = statusFilter === 'All' || bill.status === statusFilter;
     const matchesPeriod = billingPeriod === '' || bill.period === billingPeriod;
     return matchesType && matchesSearch && matchesStatus && matchesPeriod;
@@ -263,14 +295,56 @@ const BillHandlerBilling = () => {
   });
 
   // Actions
-  const handleConfirm = (id) => {
+  const handleConfirm = async (id) => {
     if (window.confirm('Are you sure you want to confirm this payment?')) {
-      setBills(bills.map(bill => bill.id === id ? { ...bill, status: 'Confirmed' } : bill));
+      console.log('Sending PATCH request for id:', id);
+      // Get CSRF cookie first
+      await fetch('/sanctum/csrf-cookie', { credentials: 'include' });
+      const response = await fetch(`/api/bill-payment-validation/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: 'Confirmed' })
+      });
+      console.log('PATCH response status:', response.status);
+      if (response.ok) {
+        fetchBills();
+      } else {
+        let error = '';
+        try {
+          error = await response.json();
+        } catch (e) {
+          error = response.statusText;
+        }
+        alert('Failed to confirm: ' + (error.message || response.status));
+        console.error('API error:', error);
+      }
     }
   };
-  const handleReject = (id) => {
+  const handleReject = async (id) => {
     if (window.confirm('Are you sure you want to reject this payment?')) {
-      setBills(bills.map(bill => bill.id === id ? { ...bill, status: 'Rejected' } : bill));
+      console.log('Sending PATCH request for id:', id);
+      // Get CSRF cookie first
+      await fetch('/sanctum/csrf-cookie', { credentials: 'include' });
+      const response = await fetch(`/api/bill-payment-validation/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: 'Rejected' })
+      });
+      console.log('PATCH response status:', response.status);
+      if (response.ok) {
+        fetchBills();
+      } else {
+        let error = '';
+        try {
+          error = await response.json();
+        } catch (e) {
+          error = response.statusText;
+        }
+        alert('Failed to reject: ' + (error.message || response.status));
+        console.error('API error:', error);
+      }
     }
   };
 
@@ -306,6 +380,16 @@ const BillHandlerBilling = () => {
   function openCustomerModal(cust) {
     setSelectedCustomer(cust);
     setShowCustomerModal(true);
+  }
+
+  function openBillDetailsModal(bill) {
+    setSelectedBill(bill);
+    setShowBillDetailsModal(true);
+  }
+
+  function openCycleDetailsModal(cycle) {
+    setSelectedCycle(cycle);
+    setShowCycleDetailsModal(true);
   }
 
   return (
@@ -365,8 +449,8 @@ const BillHandlerBilling = () => {
                       className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="All">All</option>
-                      <option value="Unpaid">Unpaid</option>
                       <option value="Pending Validation">Pending Validation</option>
+                      <option value="Unpaid">Unpaid</option>
                       <option value="Confirmed">Confirmed</option>
                       <option value="Rejected">Rejected</option>
                     </select>
@@ -382,36 +466,42 @@ const BillHandlerBilling = () => {
                     />
                   </div>
                 </div>
-                {/* Bills Table */}
+
+                {/* Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                    <h3 className="font-semibold text-yellow-800">Pending Validation</h3>
+                    <p className="text-2xl font-bold text-yellow-900">{pendingCount}</p>
+                  </div>
+                  <div className="bg-gray-50 border-l-4 border-gray-400 p-4 rounded">
+                    <h3 className="font-semibold text-gray-800">Unpaid Bills</h3>
+                    <p className="text-2xl font-bold text-gray-900">{unpaidCount}</p>
+                  </div>
+                </div>
+
+                {/* Table */}
                 <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm text-left border">
+                  <table className="min-w-full bg-white">
                     <thead>
-                      <tr className="border-b">
-                        <th className="py-2 px-4 font-semibold">Customer</th>
-                        <th className="py-2 px-4 font-semibold">Account Number</th>
-                        <th className="py-2 px-4 font-semibold">Type</th>
-                        <th className="py-2 px-4 font-semibold">Period</th>
-                        <th className="py-2 px-4 font-semibold">Amount</th>
-                        <th className="py-2 px-4 font-semibold">Payment Status</th>
-                        <th className="py-2 px-4 font-semibold">Payment Date</th>
-                        <th className="py-2 px-4 font-semibold">Method</th>
-                        <th className="py-2 px-4 font-semibold">Reference</th>
-                        <th className="py-2 px-4 font-semibold">Actions</th>
+                      <tr className="bg-gray-50">
+                        <th className="py-2 px-4 text-left">Customer</th>
+                        <th className="py-2 px-4 text-left">Account Number</th>
+                        <th className="py-2 px-4 text-left">Amount</th>
+                        <th className="py-2 px-4 text-left">Status</th>
+                        <th className="py-2 px-4 text-left">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredBills.length === 0 ? (
                         <tr>
-                          <td colSpan={10} className="py-4 text-center text-gray-500">No bills found</td>
+                          <td colSpan={5} className="py-4 text-center text-gray-500">No bills found</td>
                         </tr>
                       ) : (
                         filteredBills.map(bill => (
                           <tr key={bill.id} className="border-b">
                             <td className="py-2 px-4">{bill.customer}</td>
-                            <td className="py-2 px-4">{formatAccountNumber(bill.accountNumber)}</td>
-                            <td className="py-2 px-4">{bill.accountType}</td>
-                            <td className="py-2 px-4">{bill.period}</td>
-                            <td className="py-2 px-4">₱{bill.amount.toLocaleString()}</td>
+                            <td className="py-2 px-4">{formatAccountNumber(bill.account_number)}</td>
+                            <td className="py-2 px-4">₱{bill.amount?.toLocaleString()}</td>
                             <td className="py-2 px-4">
                               <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                                 bill.status === 'Pending Validation' ? 'bg-yellow-100 text-yellow-800' :
@@ -420,24 +510,35 @@ const BillHandlerBilling = () => {
                                 bill.status === 'Rejected' ? 'bg-red-100 text-red-800' : ''
                               }`}>{bill.status}</span>
                             </td>
-                            <td className="py-2 px-4">{bill.paymentDate || '-'}</td>
-                            <td className="py-2 px-4">{bill.paymentMethod || '-'}</td>
-                            <td className="py-2 px-4">{bill.reference || '-'}</td>
                             <td className="py-2 px-4">
-                              <div className="flex gap-2 flex-wrap">
-                                {bill.status === 'Pending Validation' && (
+                              <div className="flex gap-2 min-w-[180px]">
+                                {bill.status === 'Pending Validation' ? (
                                   <>
-                                    <button onClick={() => handleConfirm(bill.id)} className="bg-green-600 text-white min-w-[80px] px-3 py-1 rounded hover:bg-green-700 text-xs">Confirm</button>
-                                    <button onClick={() => handleReject(bill.id)} className="bg-red-600 text-white min-w-[80px] px-3 py-1 rounded hover:bg-red-700 text-xs">Reject</button>
-                                    <button className="bg-gray-300 text-gray-800 min-w-[80px] px-3 py-1 rounded hover:bg-gray-400 text-xs">View</button>
+                                    <button
+                                      onClick={() => handleConfirm(bill.id)}
+                                      className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-xs"
+                                    >
+                                      Confirm
+                                    </button>
+                                    <button
+                                      onClick={() => handleReject(bill.id)}
+                                      className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-xs"
+                                    >
+                                      Reject
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button className="invisible px-3 py-1 text-xs">Confirm</button>
+                                    <button className="invisible px-3 py-1 text-xs">Reject</button>
                                   </>
                                 )}
-                                {bill.status === 'Unpaid' && (
-                                  <span className="text-xs text-gray-400 min-w-[80px] inline-block text-center">No action</span>
-                                )}
-                                {(bill.status === 'Confirmed' || bill.status === 'Rejected') && (
-                                  <button className="bg-gray-300 text-gray-800 min-w-[80px] px-3 py-1 rounded hover:bg-gray-400 text-xs">View</button>
-                                )}
+                                <button
+                                  onClick={() => openBillDetailsModal(bill)}
+                                  className="bg-gray-300 text-gray-800 px-3 py-1 rounded hover:bg-gray-400 text-xs"
+                                >
+                                  Details
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -446,20 +547,27 @@ const BillHandlerBilling = () => {
                     </tbody>
                   </table>
                 </div>
-                {/* Summary */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-6 gap-3">
-                  <div className="text-gray-700 text-sm">{pendingCount} payments pending validation, {unpaidCount} unpaid bills.</div>
-                </div>
-                {/* Help/Instructions */}
-                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded mt-6">
-                  <h4 className="font-semibold mb-1">How to validate payments</h4>
-                  <ul className="list-disc list-inside text-sm text-blue-900">
-                    <li>Filter by period, account type, status, or search for a customer.</li>
-                    <li>Review payment details for each bill.</li>
-                    <li>Click <b>Confirm</b> to validate a payment, or <b>Reject</b> if invalid.</li>
-                    <li>Use <b>View</b> to see more payment details if needed.</li>
-                  </ul>
-                </div>
+
+                {/* Bill Details Modal */}
+                {showBillDetailsModal && selectedBill && (
+                  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+                      <h2 className="text-lg font-bold mb-4">Bill Details</h2>
+                      <div className="mb-2"><b>Customer:</b> {selectedBill.customer}</div>
+                      <div className="mb-2"><b>Account Number:</b> {formatAccountNumber(selectedBill.account_number)}</div>
+                      <div className="mb-2"><b>Account Type:</b> {selectedBill.account_type}</div>
+                      <div className="mb-2"><b>Period:</b> {selectedBill.period}</div>
+                      <div className="mb-2"><b>Amount:</b> ₱{selectedBill.amount?.toLocaleString()}</div>
+                      <div className="mb-2"><b>Status:</b> {selectedBill.status}</div>
+                      <div className="mb-2"><b>Payment Date:</b> {selectedBill.payment_date || '-'}</div>
+                      <div className="mb-2"><b>Payment Method:</b> {selectedBill.payment_method || '-'}</div>
+                      <div className="mb-2"><b>Reference:</b> {selectedBill.reference || '-'}</div>
+                      <div className="flex justify-end gap-2 mt-4">
+                        <button onClick={() => setShowBillDetailsModal(false)} className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400">Close</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : activeTab === 'billing-cycles' ? (
               <div className="py-8">
@@ -498,54 +606,57 @@ const BillHandlerBilling = () => {
                     />
                   </div>
                 </div>
+
                 {/* Table */}
                 <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm text-left border">
+                  <table className="min-w-full bg-white">
                     <thead>
-                      <tr className="border-b">
-                        <th className="py-2 px-4 font-semibold">Customer</th>
-                        <th className="py-2 px-4 font-semibold">Account Number</th>
-                        <th className="py-2 px-4 font-semibold">Account Type</th>
-                        <th className="py-2 px-4 font-semibold">Billing Period</th>
-                        <th className="py-2 px-4 font-semibold">Cycle Date</th>
-                        <th className="py-2 px-4 font-semibold">Meter Reading Date</th>
-                        <th className="py-2 px-4 font-semibold">Previous Reading</th>
-                        <th className="py-2 px-4 font-semibold">Current Reading</th>
-                        <th className="py-2 px-4 font-semibold">Consumption</th>
-                        <th className="py-2 px-4 font-semibold">Total Amount</th>
-                        <th className="py-2 px-4 font-semibold">Bill Generated</th>
-                        <th className="py-2 px-4 font-semibold">Due Date</th>
-                        <th className="py-2 px-4 font-semibold">Payment Status</th>
-                        <th className="py-2 px-4 font-semibold">Remarks</th>
-                        <th className="py-2 px-4 font-semibold">Actions</th>
+                      <tr className="bg-gray-50">
+                        <th className="py-2 px-4 text-left">Customer</th>
+                        <th className="py-2 px-4 text-left">Account Number</th>
+                        <th className="py-2 px-4 text-left">Current Reading</th>
+                        <th className="py-2 px-4 text-left">Previous Reading</th>
+                        <th className="py-2 px-4 text-left">Amount Due</th>
+                        <th className="py-2 px-4 text-left">Due Date</th>
+                        <th className="py-2 px-4 text-left">Status</th>
+                        <th className="py-2 px-4 text-left">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredCycles.length === 0 ? (
                         <tr>
-                          <td colSpan={15} className="py-4 text-center text-gray-500">No billing cycles found</td>
+                          <td colSpan={8} className="py-4 text-center text-gray-500">No billing cycles found</td>
                         </tr>
                       ) : (
                         filteredCycles.map(cycle => (
                           <tr key={cycle.id} className="border-b">
                             <td className="py-2 px-4">{cycle.customer}</td>
                             <td className="py-2 px-4">{formatAccountNumber(cycle.accountNumber)}</td>
-                            <td className="py-2 px-4">{cycle.accountType}</td>
-                            <td className="py-2 px-4">{cycle.billingPeriod}</td>
-                            <td className="py-2 px-4">{formatDate(cycle.cycleDate)}</td>
-                            <td className="py-2 px-4">{formatDate(cycle.meterReadingDate)}</td>
-                            <td className="py-2 px-4">{cycle.prevReading}</td>
                             <td className="py-2 px-4">{cycle.currReading}</td>
-                            <td className="py-2 px-4">{cycle.consumption}</td>
+                            <td className="py-2 px-4">{cycle.prevReading}</td>
                             <td className="py-2 px-4">₱{cycle.totalAmount.toLocaleString()}</td>
-                            <td className="py-2 px-4">{formatDate(cycle.billGenerated)}</td>
                             <td className="py-2 px-4">{formatDate(cycle.dueDate)}</td>
-                            <td className="py-2 px-4">{cycle.paymentStatus}</td>
-                            <td className="py-2 px-4 whitespace-pre-line">{cycle.remarks}</td>
                             <td className="py-2 px-4">
-                              <div className="flex gap-2 flex-wrap">
-                                <button onClick={() => openCycleModal(cycle)} className="bg-blue-600 text-white min-w-[90px] px-3 py-1 rounded hover:bg-blue-700 text-xs">Change Cycle</button>
-                                <button onClick={() => openRemarksModal(cycle)} className="bg-gray-300 text-gray-800 min-w-[90px] px-3 py-1 rounded hover:bg-gray-400 text-xs">Edit Remarks</button>
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                cycle.paymentStatus === 'Paid' ? 'bg-green-100 text-green-800' :
+                                cycle.paymentStatus === 'Unpaid' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>{cycle.paymentStatus}</span>
+                            </td>
+                            <td className="py-2 px-4">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => openCycleModal(cycle)}
+                                  className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-xs"
+                                >
+                                  Change Cycle
+                                </button>
+                                <button
+                                  onClick={() => openCycleDetailsModal(cycle)}
+                                  className="bg-gray-300 text-gray-800 px-3 py-1 rounded hover:bg-gray-400 text-xs"
+                                >
+                                  Details
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -554,8 +665,36 @@ const BillHandlerBilling = () => {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Cycle Details Modal */}
+                {showCycleDetailsModal && selectedCycle && (
+                  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+                      <h2 className="text-lg font-bold mb-4">Billing Cycle Details</h2>
+                      <div className="mb-2"><b>Customer:</b> {selectedCycle.customer}</div>
+                      <div className="mb-2"><b>Account Number:</b> {formatAccountNumber(selectedCycle.accountNumber)}</div>
+                      <div className="mb-2"><b>Account Type:</b> {selectedCycle.accountType}</div>
+                      <div className="mb-2"><b>Billing Period:</b> {selectedCycle.billingPeriod}</div>
+                      <div className="mb-2"><b>Cycle Date:</b> {formatDate(selectedCycle.cycleDate)}</div>
+                      <div className="mb-2"><b>Meter Reading Date:</b> {formatDate(selectedCycle.meterReadingDate)}</div>
+                      <div className="mb-2"><b>Previous Reading:</b> {selectedCycle.prevReading}</div>
+                      <div className="mb-2"><b>Current Reading:</b> {selectedCycle.currReading}</div>
+                      <div className="mb-2"><b>Consumption:</b> {selectedCycle.consumption}</div>
+                      <div className="mb-2"><b>Rate:</b> ₱{selectedCycle.rate.toLocaleString()}</div>
+                      <div className="mb-2"><b>Total Amount:</b> ₱{selectedCycle.totalAmount.toLocaleString()}</div>
+                      <div className="mb-2"><b>Bill Generated:</b> {formatDate(selectedCycle.billGenerated)}</div>
+                      <div className="mb-2"><b>Due Date:</b> {formatDate(selectedCycle.dueDate)}</div>
+                      <div className="mb-2"><b>Payment Status:</b> {selectedCycle.paymentStatus}</div>
+                      <div className="mb-2"><b>Remarks:</b> <span className="whitespace-pre-line">{selectedCycle.remarks || '-'}</span></div>
+                      <div className="flex justify-end gap-2 mt-4">
+                        <button onClick={() => setShowCycleDetailsModal(false)} className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400">Close</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Change Cycle Modal */}
-                {showCycleModal && (
+                {showCycleModal && selectedCycle && (
                   <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
                       <h2 className="text-lg font-bold mb-4">Change Billing Cycle</h2>
@@ -583,24 +722,6 @@ const BillHandlerBilling = () => {
                       <div className="flex justify-end gap-2">
                         <button onClick={() => setShowCycleModal(false)} className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400">Cancel</button>
                         <button onClick={handleCycleChange} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {/* Edit Remarks Modal */}
-                {showRemarksModal && (
-                  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-                      <h2 className="text-lg font-bold mb-4">Edit Remarks</h2>
-                      <textarea
-                        value={newRemarks}
-                        onChange={e => setNewRemarks(e.target.value)}
-                        rows={4}
-                        className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
-                      />
-                      <div className="flex justify-end gap-2">
-                        <button onClick={() => setShowRemarksModal(false)} className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400">Cancel</button>
-                        <button onClick={handleRemarksSave} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save</button>
                       </div>
                     </div>
                   </div>
@@ -643,48 +764,48 @@ const BillHandlerBilling = () => {
                     />
                   </div>
                 </div>
+
                 {/* Table */}
                 <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm text-left border">
+                  <table className="min-w-full bg-white">
                     <thead>
-                      <tr className="border-b">
-                        <th className="py-2 px-4 font-semibold">Customer</th>
-                        <th className="py-2 px-4 font-semibold">Account Number</th>
-                        <th className="py-2 px-4 font-semibold">Account Type</th>
-                        <th className="py-2 px-4 font-semibold">Billing Period</th>
-                        <th className="py-2 px-4 font-semibold">Bill Date</th>
-                        <th className="py-2 px-4 font-semibold">Due Date</th>
-                        <th className="py-2 px-4 font-semibold">Amount</th>
-                        <th className="py-2 px-4 font-semibold">Payment Status</th>
-                        <th className="py-2 px-4 font-semibold">Payment Date</th>
-                        <th className="py-2 px-4 font-semibold">Method</th>
-                        <th className="py-2 px-4 font-semibold">Reference</th>
-                        <th className="py-2 px-4 font-semibold">Remarks</th>
-                        <th className="py-2 px-4 font-semibold">Actions</th>
+                      <tr className="bg-gray-50">
+                        <th className="py-2 px-4 text-left">Customer</th>
+                        <th className="py-2 px-4 text-left">Account Number</th>
+                        <th className="py-2 px-4 text-left">Billing Period</th>
+                        <th className="py-2 px-4 text-left">Amount</th>
+                        <th className="py-2 px-4 text-left">Due Date</th>
+                        <th className="py-2 px-4 text-left">Status</th>
+                        <th className="py-2 px-4 text-left">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredHistory.length === 0 ? (
                         <tr>
-                          <td colSpan={13} className="py-4 text-center text-gray-500">No billing history found</td>
+                          <td colSpan={7} className="py-4 text-center text-gray-500">No billing history found</td>
                         </tr>
                       ) : (
                         filteredHistory.map(row => (
                           <tr key={row.id} className="border-b">
                             <td className="py-2 px-4">{row.customer}</td>
                             <td className="py-2 px-4">{formatAccountNumber(row.accountNumber)}</td>
-                            <td className="py-2 px-4">{row.accountType}</td>
                             <td className="py-2 px-4">{row.billingPeriod}</td>
-                            <td className="py-2 px-4">{formatDate(row.billDate)}</td>
-                            <td className="py-2 px-4">{formatDate(row.dueDate)}</td>
                             <td className="py-2 px-4">₱{row.amount.toLocaleString()}</td>
-                            <td className="py-2 px-4">{row.paymentStatus}</td>
-                            <td className="py-2 px-4">{formatDate(row.paymentDate)}</td>
-                            <td className="py-2 px-4">{row.paymentMethod || '-'}</td>
-                            <td className="py-2 px-4">{row.reference || '-'}</td>
-                            <td className="py-2 px-4 whitespace-pre-line">{row.remarks}</td>
+                            <td className="py-2 px-4">{formatDate(row.dueDate)}</td>
                             <td className="py-2 px-4">
-                              <button onClick={() => openHistoryModal(row)} className="bg-gray-300 text-gray-800 min-w-[70px] px-3 py-1 rounded hover:bg-gray-400 text-xs">View</button>
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                row.paymentStatus === 'Paid' ? 'bg-green-100 text-green-800' :
+                                row.paymentStatus === 'Unpaid' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>{row.paymentStatus}</span>
+                            </td>
+                            <td className="py-2 px-4">
+                              <button
+                                onClick={() => openHistoryModal(row)}
+                                className="bg-gray-300 text-gray-800 px-3 py-1 rounded hover:bg-gray-400 text-xs"
+                              >
+                                Details
+                              </button>
                             </td>
                           </tr>
                         ))
@@ -692,11 +813,12 @@ const BillHandlerBilling = () => {
                     </tbody>
                   </table>
                 </div>
-                {/* View Modal */}
+
+                {/* History Details Modal */}
                 {showHistoryModal && selectedHistory && (
                   <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-                      <h2 className="text-lg font-bold mb-4">Billing Details</h2>
+                      <h2 className="text-lg font-bold mb-4">Billing History Details</h2>
                       <div className="mb-2"><b>Customer:</b> {selectedHistory.customer}</div>
                       <div className="mb-2"><b>Account Number:</b> {formatAccountNumber(selectedHistory.accountNumber)}</div>
                       <div className="mb-2"><b>Account Type:</b> {selectedHistory.accountType}</div>
@@ -706,9 +828,9 @@ const BillHandlerBilling = () => {
                       <div className="mb-2"><b>Amount:</b> ₱{selectedHistory.amount.toLocaleString()}</div>
                       <div className="mb-2"><b>Payment Status:</b> {selectedHistory.paymentStatus}</div>
                       <div className="mb-2"><b>Payment Date:</b> {formatDate(selectedHistory.paymentDate)}</div>
-                      <div className="mb-2"><b>Method:</b> {selectedHistory.paymentMethod || '-'}</div>
+                      <div className="mb-2"><b>Payment Method:</b> {selectedHistory.paymentMethod || '-'}</div>
                       <div className="mb-2"><b>Reference:</b> {selectedHistory.reference || '-'}</div>
-                      <div className="mb-2"><b>Remarks:</b> <span className="whitespace-pre-line">{selectedHistory.remarks}</span></div>
+                      <div className="mb-2"><b>Remarks:</b> <span className="whitespace-pre-line">{selectedHistory.remarks || '-'}</span></div>
                       <div className="flex justify-end gap-2 mt-4">
                         <button onClick={() => setShowHistoryModal(false)} className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400">Close</button>
                       </div>
