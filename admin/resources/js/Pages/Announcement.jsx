@@ -52,6 +52,9 @@ const Announcement = () => {
 
   const fetchAnnouncements = async () => {
     try {
+      // Ensure CSRF token is available
+      await axios.get('/sanctum/csrf-cookie');
+      
       const response = await axios.get('/api/announcements');
       console.log('Fetched announcements:', response.data); // Debug log
       if (Array.isArray(response.data)) {
@@ -64,7 +67,15 @@ const Announcement = () => {
       }
     } catch (error) {
       console.error('Error fetching announcements:', error);
-      showNotification('Failed to fetch announcements', 'error');
+      if (error.response?.status === 401) {
+        showNotification('Authentication failed. Please login again.', 'error');
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 2000);
+      } else {
+        showNotification('Failed to fetch announcements', 'error');
+      }
     }
   };
 
@@ -88,6 +99,9 @@ const Announcement = () => {
     const currentDate = new Date().toISOString().split('T')[0];
 
     try {
+      // Ensure CSRF token is available
+      await axios.get('/sanctum/csrf-cookie');
+      
       if (editingId) {
         await axios.put(`/api/announcements/${editingId}`, {
           title: form.title,
@@ -111,7 +125,14 @@ const Announcement = () => {
       setShowCreateModal(false);
     } catch (error) {
       console.error('Error saving announcement:', error);
-      showNotification(error.response?.data?.message || 'Failed to save announcement', 'error');
+      if (error.response?.status === 401) {
+        showNotification('Authentication failed. Please login again.', 'error');
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 2000);
+      } else {
+        showNotification(error.response?.data?.message || 'Failed to save announcement', 'error');
+      }
     }
   };
 
@@ -130,6 +151,9 @@ const Announcement = () => {
     if (!confirm('Are you sure you want to delete this announcement?')) return;
     
     try {
+      // Ensure CSRF token is available
+      await axios.get('/sanctum/csrf-cookie');
+      
       await axios.delete(`/api/announcements/${id}`);
       showNotification('Announcement deleted successfully');
       fetchAnnouncements();
@@ -140,7 +164,14 @@ const Announcement = () => {
       }
     } catch (error) {
       console.error('Error deleting announcement:', error);
-      showNotification(error.response?.data?.message || 'Failed to delete announcement', 'error');
+      if (error.response?.status === 401) {
+        showNotification('Authentication failed. Please login again.', 'error');
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 2000);
+      } else {
+        showNotification(error.response?.data?.message || 'Failed to delete announcement', 'error');
+      }
     }
   };
 

@@ -28,11 +28,11 @@ use App\Http\Controllers\BillPaymentValidationController;
 // Public routes
 Route::post('/admin-login', [AdminAuthController::class, 'login']);
 Route::post('/admin-logout', [AdminAuthController::class, 'logout']);
-Route::get('/check-auth', [AdminAuthController::class, 'checkAuth'])->middleware(['auth:sanctum', 'web']);
+Route::get('/check-auth', [AdminAuthController::class, 'checkAuth'])->middleware(['web']);
 Route::post('/create-staff', [AdminAuthController::class, 'createStaff']);
 
 // Protected routes
-Route::middleware(['auth:sanctum', 'web'])->group(function () {
+Route::middleware(['web'])->group(function () {
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
@@ -41,7 +41,7 @@ Route::middleware(['auth:sanctum', 'web'])->group(function () {
     Route::get('/admin/profile', [AdminProfileController::class, 'show']);
     Route::post('/admin/profile/update', [AdminProfileController::class, 'update']);
 
-    // Account Management Routes
+    // Account Management Routes  
     Route::prefix('accounts')->group(function () {
         Route::get('/', [AccountController::class, 'listAccounts']);
         Route::post('/staff', [AccountController::class, 'createStaffAccount']);
@@ -55,7 +55,7 @@ Route::middleware(['auth:sanctum', 'web'])->group(function () {
     });
 
     // Bill Handler Routes
-    Route::prefix('bill-handler')->middleware(['auth:sanctum'])->group(function () {
+    Route::prefix('bill-handler')->group(function () {
         Route::get('/bill-handler-dashboard', [BillHandlerController::class, 'BillHandlerDashboard']);
         Route::get('/customers', [BillHandlerController::class, 'getCustomers']);
     });
@@ -98,3 +98,5 @@ Route::get('/debug/check-admin', function() {
         'count' => $admins->count()
     ]);
 });
+
+

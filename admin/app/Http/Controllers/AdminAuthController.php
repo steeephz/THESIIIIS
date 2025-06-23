@@ -15,6 +15,11 @@ class AdminAuthController extends Controller
     public function login(Request $request)
     {
         try {
+            Log::info('Login attempt', [
+                'username' => $request->username,
+                'session_id' => $request->session()->getId()
+            ]);
+
             $request->validate([
                 'username' => 'required|string',
                 'password' => 'required|string'
@@ -25,7 +30,14 @@ class AdminAuthController extends Controller
                 ->where('username', $request->username)
                 ->first();
 
+            Log::info('Staff lookup', [
+                'username' => $request->username,
+                'staff_found' => $staff ? true : false,
+                'staff_role' => $staff ? $staff->role : null
+            ]);
+
             if (!$staff || !Hash::check($request->password, $staff->password)) {
+                Log::warning('Invalid credentials', ['username' => $request->username]);
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid credentials'
@@ -34,6 +46,10 @@ class AdminAuthController extends Controller
 
             // Check if user has allowed role
             if (!in_array($staff->role, ['admin', 'bill handler'])) {
+                Log::warning('Unauthorized role', [
+                    'username' => $request->username,
+                    'role' => $staff->role
+                ]);
                 return response()->json([
                     'success' => false,
                     'message' => 'You do not have permission to access this system'
@@ -44,25 +60,29 @@ class AdminAuthController extends Controller
             $user = User::updateOrCreate(
                 ['email' => $request->username . '@staff.com'],
                 [
-                    'name' => $request->username,
+                    'name' => $staff->name ?? $request->username,
                     'password' => $staff->password // Use the already hashed password
                 ]
             );
 
-            // Log the user in
-            Auth::login($user);
+            Log::info('User created/found', [
+                'user_id' => $user->id,
+                'user_email' => $user->email
+            ]);
+
+            // Log the user in using web guard
+            Auth::guard('web')->login($user, true); // Remember user
             $request->session()->regenerate();
 
-            // Create token for API authentication
-            $token = $user->createToken('staff-token')->plainTextToken;
-
-            // Store token in session
-            session(['api_token' => $token]);
+            Log::info('Login successful', [
+                'user_id' => $user->id,
+                'session_id' => $request->session()->getId(),
+                'auth_check' => Auth::guard('web')->check()
+            ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Login successful!',
-                'token' => $token,
                 'user' => [
                     'id' => $user->id,
                     'name' => $staff->name,
@@ -73,7 +93,9 @@ class AdminAuthController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Login error: ' . $e->getMessage());
+            Log::error('Login error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'An error occurred during login.'
@@ -83,17 +105,11 @@ class AdminAuthController extends Controller
 
     public function checkAuth()
     {
-        if (Auth::check()) {
-            $user = Auth::user();
-            // Refresh token if needed
-            if (!session('api_token')) {
-                $token = $user->createToken('staff-token')->plainTextToken;
-                session(['api_token' => $token]);
-            }
+        if (Auth::guard('web')->check()) {
+            $user = Auth::guard('web')->user();
             return response()->json([
                 'authenticated' => true,
-                'user' => $user,
-                'token' => session('api_token')
+                'user' => $user
             ]);
         }
         return response()->json(['authenticated' => false], 401);
@@ -102,18 +118,10 @@ class AdminAuthController extends Controller
     public function logout(Request $request)
     {
         try {
-            // Revoke all tokens
-            if (Auth::check()) {
-                Auth::user()->tokens()->delete();
-            }
-
-            // Clear session data
-            Session::flush();
-            
             // Logout the user
             Auth::guard('web')->logout();
             
-            // Invalidate and regenerate session
+            // Clear session data
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 

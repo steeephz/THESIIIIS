@@ -42,15 +42,6 @@ return [
             'after_commit' => false,
         ],
 
-        'beanstalkd' => [
-            'driver' => 'beanstalkd',
-            'host' => 'localhost',
-            'queue' => 'default',
-            'retry_after' => 90,
-            'block_for' => 0,
-            'after_commit' => false,
-        ],
-
         'sqs' => [
             'driver' => 'sqs',
             'key' => env('AWS_ACCESS_KEY_ID'),

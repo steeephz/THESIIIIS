@@ -109,7 +109,12 @@ class AccountController extends Controller
             $type = $request->query('type', 'all');
             $search = $request->query('search', '');
 
-            Log::info('Fetching accounts', ['type' => $type, 'search' => $search]);
+            Log::info('Fetching accounts', [
+                'type' => $type, 
+                'search' => $search,
+                'authenticated' => auth()->check(),
+                'user' => auth()->user() ? auth()->user()->toArray() : null
+            ]);
 
             if ($type === 'customer') {
                 // Query for customer accounts

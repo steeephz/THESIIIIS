@@ -22,7 +22,7 @@ class RateController extends Controller
                 'customer_type' => Str::lower($request->customer_type),
                 'minimum_charge' => $request->minimum_charge,
                 'rate_per_cu_m' => $request->rate_per_cu_m,
-                'effective_datec' => now(),
+                'effective_date' => now()->toDateString(),
                 'status' => 'active',
                 'created_at' => now(),
                 'updated_at' => now(),
