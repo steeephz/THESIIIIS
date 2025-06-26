@@ -28,6 +28,8 @@ const Accounts = () => {
     ]);
     const [formData, setFormData] = useState({
         name: '',
+        first_name: '',
+        last_name: '',
         username: '',
         password: '',
         role: 'admin',
@@ -52,7 +54,9 @@ const Accounts = () => {
 
     // Add validation state
     const [formErrors, setFormErrors] = useState({
-        name: '',
+        name: '', // Only used for staff
+        first_name: '', // Only used for customers
+        last_name: '', // Only used for customers
         username: '',
         account_number: '',
         meter_number: '',
@@ -155,47 +159,60 @@ const Accounts = () => {
         const { name, value } = e.target;
         let error = '';
 
-        switch (name) {
-            case 'name':
-                if (!validateName(value)) {
-                    error = 'Name should only contain letters';
-                }
-                break;
-            case 'username':
-                if (!validateUsername(value)) {
-                    error = 'Username should not contain spaces or special characters';
-                }
-                break;
-            case 'password':
-                if (!validatePassword(value)) {
-                    error = 'Password must contain at least one number and one special character';
-                }
-                break;
-            case 'account_number':
-                if (!validateAccountNumber(value)) {
-                    error = 'Account number should be in format XX-XXXXXX (9 characters)';
-                }
-                break;
-            case 'contact_number':
-                if (!validateContactNumber(value)) {
-                    error = 'Contact number should be 11 digits';
-                }
-                break;
-            case 'meter_number':
-                if (!validateMeterNumber(value)) {
-                    error = 'Meter number should be 9 digits';
-                }
-                break;
-            case 'address':
-                if (!validateAddress(value)) {
-                    error = 'Address should not contain special characters';
-                }
-                break;
-            case 'email':
-                if (!validateEmail(value)) {
-                    error = 'Please enter a valid email address';
-                }
-                break;
+        // Only validate if the field has content (not empty)
+        if (value.trim() !== '') {
+            switch (name) {
+                case 'name':
+                    if (!validateName(value)) {
+                        error = 'Name should only contain letters';
+                    }
+                    break;
+                case 'first_name':
+                    if (!validateName(value)) {
+                        error = 'First name should only contain letters';
+                    }
+                    break;
+                case 'last_name':
+                    if (!validateName(value)) {
+                        error = 'Last name should only contain letters';
+                    }
+                    break;
+                case 'username':
+                    if (!validateUsername(value)) {
+                        error = 'Username should not contain spaces or special characters';
+                    }
+                    break;
+                case 'password':
+                    if (!validatePassword(value)) {
+                        error = 'Password must contain at least one number and one special character';
+                    }
+                    break;
+                case 'account_number':
+                    if (!validateAccountNumber(value)) {
+                        error = 'Account number should be in format XX-XXXXXX (9 characters)';
+                    }
+                    break;
+                case 'contact_number':
+                    if (!validateContactNumber(value)) {
+                        error = 'Contact number should be 11 digits';
+                    }
+                    break;
+                case 'meter_number':
+                    if (!validateMeterNumber(value)) {
+                        error = 'Meter number should be 9 digits';
+                    }
+                    break;
+                case 'address':
+                    if (!validateAddress(value)) {
+                        error = 'Address should not contain special characters';
+                    }
+                    break;
+                case 'email':
+                    if (!validateEmail(value)) {
+                        error = 'Please enter a valid email address';
+                    }
+                    break;
+            }
         }
 
         setFormErrors(prev => ({
@@ -217,7 +234,9 @@ const Accounts = () => {
         setEditingAccount(account);
         setFormType(account.type === 'customer' ? 'customer' : 'staff');
         setFormData({
-            name: account.name,
+            name: account.type === 'staff' ? account.name : '', // Only set name for staff
+            first_name: account.first_name || '',
+            last_name: account.last_name || '',
             username: account.username,
             password: '', // Empty for edit
             role: account.role || 'admin',
@@ -269,36 +288,45 @@ const Accounts = () => {
         // Validate all fields before submission
         const errors = {};
         
-        // Always validate these fields
-        if (!validateName(formData.name)) {
-            errors.name = 'Name should only contain letters';
+        // Common validations for all forms
+        if (!formData.username || !validateUsername(formData.username)) {
+            errors.username = 'Username is required and should not contain spaces or special characters';
         }
-        if (!validateUsername(formData.username)) {
-            errors.username = 'Username should not contain spaces or special characters';
+        if (!formData.email || !validateEmail(formData.email)) {
+            errors.email = 'Email is required and must be a valid email address';
         }
-        if (!validateEmail(formData.email)) {
-            errors.email = 'Please enter a valid email address';
+        if (!formData.address || !validateAddress(formData.address)) {
+            errors.address = 'Address is required and should not contain special characters';
         }
-        if (!validateAddress(formData.address)) {
-            errors.address = 'Address should not contain special characters';
-        }
-        if (!validateContactNumber(formData.contact_number)) {
-            errors.contact_number = 'Contact number should be 11 digits';
+        if (!formData.contact_number || !validateContactNumber(formData.contact_number)) {
+            errors.contact_number = 'Contact number is required and should be 11 digits';
         }
 
-        // Only validate customer-specific fields if it's a customer form
-        if (formType === 'customer') {
-            if (!validateAccountNumber(formData.account_number)) {
-                errors.account_number = 'Account number should be in format XX-XXXXXX (9 characters)';
+        // Validate name fields based on form type
+        if (formType === 'staff') {
+            // For staff, validate the single name field
+            if (!formData.name || !validateName(formData.name)) {
+                errors.name = 'Name is required and should only contain letters';
             }
-            if (!validateMeterNumber(formData.meter_number)) {
-                errors.meter_number = 'Meter number should be 9 digits';
+        } else if (formType === 'customer') {
+            // For customers, validate first_name and last_name
+            if (!formData.first_name || !validateName(formData.first_name)) {
+                errors.first_name = 'First name is required and should only contain letters';
+            }
+            if (!formData.last_name || !validateName(formData.last_name)) {
+                errors.last_name = 'Last name is required and should only contain letters';
+            }
+            if (!formData.account_number || !validateAccountNumber(formData.account_number)) {
+                errors.account_number = 'Account number is required and should be in format XX-XXXXXX (9 characters)';
+            }
+            if (!formData.meter_number || !validateMeterNumber(formData.meter_number)) {
+                errors.meter_number = 'Meter number is required and should be 9 digits';
             }
         }
 
         // Only validate password for new accounts
-        if (!editingAccount && !validatePassword(formData.password)) {
-            errors.password = 'Password must contain at least one number and one special character';
+        if (!editingAccount && (!formData.password || !validatePassword(formData.password))) {
+            errors.password = 'Password is required and must contain at least one number and one special character';
         }
 
         setFormErrors(errors);
@@ -321,7 +349,8 @@ const Accounts = () => {
             } else {
                 // Handle customer creation/update
                 const customerData = {
-                    name: formData.name,
+                    first_name: formData.first_name,
+                    last_name: formData.last_name,
                     username: formData.username,
                     customer_type: formData.customer_type,
                     address: formData.address,
@@ -348,6 +377,8 @@ const Accounts = () => {
                 setEditingAccount(null);
                 setFormData({
                     name: '',
+                    first_name: '',
+                    last_name: '',
                     username: '',
                     password: '',
                     role: 'admin',
@@ -383,6 +414,8 @@ const Accounts = () => {
     const clearFormData = () => {
         setFormData({
             name: '',
+            first_name: '',
+            last_name: '',
             username: '',
             password: '',
             role: 'admin',
@@ -462,22 +495,41 @@ const Accounts = () => {
                                 </>
                             ) : (
                                 <>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">
-                                            Name
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="name"
-                                            value={formData.name}
-                                            onChange={handleInputChange}
-                                            className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
-                                                formErrors.name ? 'border-red-500' : 'border-gray-300'
-                                            }`}
-                                        />
-                                        {formErrors.name && (
-                                            <p className="mt-1 text-sm text-red-600">{formErrors.name}</p>
-                                        )}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">
+                                                First Name
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="first_name"
+                                                value={formData.first_name}
+                                                onChange={handleInputChange}
+                                                className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                                                    formErrors.first_name ? 'border-red-500' : 'border-gray-300'
+                                                }`}
+                                            />
+                                            {formErrors.first_name && (
+                                                <p className="mt-1 text-sm text-red-600">{formErrors.first_name}</p>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">
+                                                Last Name
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="last_name"
+                                                value={formData.last_name}
+                                                onChange={handleInputChange}
+                                                className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                                                    formErrors.last_name ? 'border-red-500' : 'border-gray-300'
+                                                }`}
+                                            />
+                                            {formErrors.last_name && (
+                                                <p className="mt-1 text-sm text-red-600">{formErrors.last_name}</p>
+                                            )}
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700">
@@ -781,7 +833,11 @@ const Accounts = () => {
                                     <tr key={account.id} className="border-b hover:bg-blue-50">
                                         {activeTab === 'customer' ? (
                                             <>
-                                                <td className="py-3 px-4">{account.name}</td>
+                                                <td className="py-3 px-4">
+                                                    {account.first_name && account.last_name 
+                                                        ? `${account.first_name} ${account.last_name}` 
+                                                        : account.name}
+                                                </td>
                                                 <td className="py-3 px-4">{account.username}</td>
                                                 <td className="py-3 px-4">{account.customer_type}</td>
                                                 <td className="py-3 px-4">{account.address}</td>
@@ -873,4 +929,4 @@ const Accounts = () => {
     );
 };
 
-export default Accounts; 
+export default Accounts;    

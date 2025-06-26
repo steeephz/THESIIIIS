@@ -123,7 +123,9 @@ class AccountController extends Controller
                 // Add search conditions if search term exists
                 if ($search) {
                     $query->where(function($q) use ($search) {
-                        $q->where('name', 'like', "%{$search}%")
+                        $q->where('first_name', 'like', "%{$search}%")
+                          ->orWhere('last_name', 'like', "%{$search}%")
+                          ->orWhere('full_name', 'like', "%{$search}%")
                           ->orWhere('username', 'like', "%{$search}%")
                           ->orWhere('email', 'like', "%{$search}%")
                           ->orWhere('account_number', 'like', "%{$search}%")
@@ -140,7 +142,9 @@ class AccountController extends Controller
                 $formattedAccounts = $customerAccounts->map(function($customer) {
                     return [
                         'id' => $customer->id,
-                        'name' => $customer->name,
+                        'name' => $customer->full_name ?? $customer->name ?? '', // backward compatibility
+                        'first_name' => $customer->first_name ?? '',
+                        'last_name' => $customer->last_name ?? '',
                         'username' => $customer->username,
                         'email' => $customer->email,
                         'customer_type' => $customer->customer_type,
@@ -178,7 +182,9 @@ class AccountController extends Controller
                 $customerQuery = DB::table('customers_tb');
                 if ($search) {
                     $customerQuery->where(function($q) use ($search) {
-                        $q->where('name', 'like', "%{$search}%")
+                        $q->where('first_name', 'like', "%{$search}%")
+                          ->orWhere('last_name', 'like', "%{$search}%")
+                          ->orWhere('full_name', 'like', "%{$search}%")
                           ->orWhere('username', 'like', "%{$search}%")
                           ->orWhere('email', 'like', "%{$search}%")
                           ->orWhere('account_number', 'like', "%{$search}%")
@@ -205,7 +211,9 @@ class AccountController extends Controller
                 $formattedCustomerAccounts = $customerAccounts->map(function($customer) {
                     return [
                         'id' => $customer->id,
-                        'name' => $customer->name,
+                        'name' => $customer->full_name ?? $customer->name ?? '', // backward compatibility
+                        'first_name' => $customer->first_name ?? '',
+                        'last_name' => $customer->last_name ?? '',
                         'username' => $customer->username,
                         'email' => $customer->email,
                         'customer_type' => $customer->customer_type,
@@ -364,7 +372,8 @@ class AccountController extends Controller
     {
         try {
             $validated = $request->validate([
-                'name' => 'required|string|max:100',
+                'first_name' => 'required|string|max:50',
+                'last_name' => 'required|string|max:50',
                 'email' => 'required|email|max:100|unique:customers_tb,email',
                 'password' => 'required|min:8|max:255',
                 'customer_type' => 'required|in:residential,commercial,government|max:20',
@@ -377,6 +386,9 @@ class AccountController extends Controller
             // Hash the password
             $validated['password'] = bcrypt($validated['password']);
 
+            // Generate full_name from first_name and last_name
+            $full_name = trim($validated['first_name'] . ' ' . $validated['last_name']);
+
             // Generate username from email (everything before @)
             $username = explode('@', $validated['email'])[0];
             // Ensure username doesn't exceed 50 characters
@@ -384,7 +396,9 @@ class AccountController extends Controller
 
             // Insert into customers_tb
             $customer = DB::table('customers_tb')->insertGetId([
-                'name' => $validated['name'],
+                'first_name' => $validated['first_name'],
+                'last_name' => $validated['last_name'],
+                'full_name' => $full_name,
                 'username' => $username,
                 'password' => $validated['password'],
                 'customer_type' => $validated['customer_type'],
@@ -418,7 +432,8 @@ class AccountController extends Controller
     {
         try {
             $request->validate([
-                'name' => 'required|string|max:255',
+                'first_name' => 'required|string|max:50',
+                'last_name' => 'required|string|max:50',
                 'username' => 'required|string|max:255|unique:customers_tb,username,' . $id,
                 'customer_type' => 'required|in:residential,commercial,government',
                 'address' => 'required|string|max:255',
@@ -437,8 +452,13 @@ class AccountController extends Controller
                 ], 404);
             }
 
+            // Generate full_name from first_name and last_name
+            $full_name = trim($request->first_name . ' ' . $request->last_name);
+
             DB::table('customers_tb')->where('id', $id)->update([
-                'name' => $request->name,
+                'first_name' => $request->first_name,
+                'last_name' => $request->last_name,
+                'full_name' => $full_name,
                 'username' => $request->username,
                 'customer_type' => $request->customer_type,
                 'address' => $request->address,
