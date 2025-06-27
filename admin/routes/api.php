@@ -90,12 +90,20 @@ Route::middleware(['web'])->group(function () {
     Route::patch('/bill-payment-validation/{id}/status', [BillPaymentValidationController::class, 'updateStatus']);
 });
 
-// Temporary debug route
+// Temporary debug routes
 Route::get('/debug/check-admin', function() {
     $admins = DB::table('admin')->get();
     return response()->json([
         'admins' => $admins,
         'count' => $admins->count()
+    ]);
+});
+
+Route::get('/debug/check-staff', function() {
+    $staff = DB::table('staff_tb')->get();
+    return response()->json([
+        'staff' => $staff,
+        'count' => $staff->count()
     ]);
 });
 

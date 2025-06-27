@@ -15,6 +15,7 @@ class VerifyCsrfToken extends Middleware
         'api/bill-payment-validation/*/status',
         'api/admin-login',
         'api/admin-logout',
+        'api/admin/profile/update',
         'api/announcements',
         'api/announcements/*',
         'api/accounts',

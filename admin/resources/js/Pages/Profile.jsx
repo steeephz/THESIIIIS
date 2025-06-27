@@ -27,20 +27,14 @@ const Profile = () => {
     useEffect(() => {
         const initializeProfile = async () => {
             try {
-                // First get CSRF cookie
-                await axios.get('/sanctum/csrf-cookie');
-                
+                // Clear any existing messages
+                setMessage({ type: '', text: '' });
+
                 // Check authentication status
                 const authCheck = await axios.get('/api/check-auth');
                 if (!authCheck.data.authenticated) {
                     router.visit('/');
                     return;
-                }
-
-                // Set token in axios headers
-                const token = authCheck.data.token;
-                if (token) {
-                    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
                 }
 
                 // Now fetch profile data
@@ -52,7 +46,7 @@ const Profile = () => {
                 } else {
                     setMessage({ 
                         type: 'error', 
-                        text: 'Failed to initialize profile. Please refresh the page.' 
+                        text: 'Failed to load profile data. Please refresh the page.' 
                     });
                 }
             }
@@ -70,8 +64,10 @@ const Profile = () => {
         try {
             const response = await axios.get('/api/admin/profile');
             if (response.data) {
+                console.log('Profile data received:', response.data);
                 setProfileData(response.data);
                 if (response.data.profile_picture) {
+                    console.log('Setting preview image to:', response.data.profile_picture);
                     setPreviewImage(response.data.profile_picture);
                 }
             }
@@ -89,21 +85,39 @@ const Profile = () => {
     };
 
     const handleImageChange = (e) => {
+        console.log('=== IMAGE CHANGE DEBUG ===');
         const file = e.target.files[0];
+        console.log('Selected file:', file);
+        
         if (file) {
+            console.log('File details:', {
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                lastModified: file.lastModified
+            });
+            
             // Validate file type and size
             const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
             if (!validTypes.includes(file.type)) {
+                console.log('Invalid file type:', file.type);
                 setMessage({ type: 'error', text: 'Please upload a valid image file (JPEG, PNG, or GIF)' });
                 return;
             }
             if (file.size > 2 * 1024 * 1024) { // 2MB limit
+                console.log('File too large:', file.size);
                 setMessage({ type: 'error', text: 'Image size should be less than 2MB' });
                 return;
             }
 
+            console.log('File validation passed, updating state...');
+            const objectURL = URL.createObjectURL(file);
+            console.log('Created object URL:', objectURL);
+            
             setProfileData({ ...profileData, profile_picture: file });
-            setPreviewImage(URL.createObjectURL(file));
+            setPreviewImage(objectURL);
+        } else {
+            console.log('No file selected');
         }
     };
 
@@ -114,21 +128,34 @@ const Profile = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        console.log('=== PROFILE SUBMIT DEBUG ===');
+        console.log('Profile data:', profileData);
+        console.log('Has profile picture file:', profileData.profile_picture instanceof File);
+        
         try {
             const formData = new FormData();
             
             // Add all profile data to formData except password and profile_picture
             Object.keys(profileData).forEach(key => {
                 if (key !== 'password' && key !== 'profile_picture') {
+                    console.log(`Adding to formData: ${key} = ${profileData[key]}`);
                     formData.append(key, profileData[key]);
                 }
             });
 
             // Handle profile picture separately
             if (profileData.profile_picture instanceof File) {
+                console.log('Adding profile picture file:', {
+                    name: profileData.profile_picture.name,
+                    size: profileData.profile_picture.size,
+                    type: profileData.profile_picture.type
+                });
                 formData.append('profile_picture', profileData.profile_picture);
+            } else {
+                console.log('No profile picture file to upload');
             }
 
+            console.log('Sending request to /api/admin/profile/update');
             const response = await axios.post('/api/admin/profile/update', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
@@ -136,25 +163,49 @@ const Profile = () => {
                 },
             });
 
+            console.log('Response received:', response.data);
+
             if (response.data.success) {
+                console.log('Profile update successful!');
                 setMessage({ type: 'success', text: 'Profile updated successfully!' });
                 setIsEditing(false);
                 
                 // Refresh profile data
+                console.log('Fetching updated profile...');
                 const updatedProfile = await axios.get('/api/admin/profile');
+                console.log('Updated profile data:', updatedProfile.data);
+                
                 setProfileData(prev => ({
                     ...prev,
                     ...updatedProfile.data,
                     profile_picture: null // Reset the file input
                 }));
+                
+                // Force image refresh with cache busting
                 if (updatedProfile.data.profile_picture) {
-                    setPreviewImage(updatedProfile.data.profile_picture + '?t=' + new Date().getTime());
+                    const newImageUrl = updatedProfile.data.profile_picture + '?t=' + new Date().getTime();
+                    console.log('Setting new preview image:', newImageUrl);
+                    setPreviewImage(newImageUrl);
+                    
+                    // Force image reload by clearing and resetting
+                    setTimeout(() => {
+                        setPreviewImage(null);
+                        setTimeout(() => {
+                            setPreviewImage(newImageUrl);
+                        }, 100);
+                    }, 100);
+                } else {
+                    console.log('No profile picture in response, keeping current preview');
                 }
             } else {
+                console.log('Profile update failed:', response.data.message);
                 throw new Error(response.data.message || 'Failed to update profile');
             }
         } catch (error) {
-            console.error('Error updating profile:', error);
+            console.error('=== PROFILE UPDATE ERROR ===');
+            console.error('Error object:', error);
+            console.error('Response data:', error.response?.data);
+            console.error('Response status:', error.response?.status);
             setMessage({ 
                 type: 'error', 
                 text: error.response?.data?.message || 'Failed to update profile. Please try again.' 
@@ -210,8 +261,7 @@ const Profile = () => {
                                 onClick={async () => {
                                     if (window.confirm('Are you sure you want to log out?')) {
                                         try {
-                                            await axios.get('/sanctum/csrf-cookie');
-                                            await axios.post('/admin/logout');
+                                            await axios.post('/api/admin-logout');
                                             window.location.href = '/';
                                         } catch (error) {
                                             window.location.href = '/';
@@ -253,9 +303,13 @@ const Profile = () => {
                                 <div className="flex flex-col items-center w-full lg:w-auto md:w-auto">
                                     <div className="relative">
                                         <img
-                                            src={previewImage || `https://ui-avatars.com/api/?name=${profileData.name}&background=0D8ABC&color=fff&size=200`}
+                                            src={previewImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(profileData.name || 'User')}&background=0D8ABC&color=fff&size=200`}
                                             alt="Profile"
                                             className="w-48 h-48 rounded-full object-cover"
+                                            onError={(e) => {
+                                                console.log('Image load error:', e.target.src);
+                                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profileData.name || 'User')}&background=0D8ABC&color=fff&size=200`;
+                                            }}
                                         />
                                         {isEditing && (
                                             <label className="absolute bottom-0 right-0 bg-blue-500 text-white p-2 rounded-full cursor-pointer">
