@@ -108,10 +108,14 @@ class AccountController extends Controller
         try {
             $type = $request->query('type', 'all');
             $search = $request->query('search', '');
+            $page = (int) $request->query('page', 1);
+            $perPage = 10; // Fixed to 10 accounts per page
 
             Log::info('Fetching accounts', [
                 'type' => $type, 
                 'search' => $search,
+                'page' => $page,
+                'per_page' => $perPage,
                 'authenticated' => auth()->check(),
                 'user' => auth()->user() ? auth()->user()->toArray() : null
             ]);
@@ -133,10 +137,14 @@ class AccountController extends Controller
                     });
                 }
 
-                // Get all customer accounts
-                $customerAccounts = $query->get();
+                // Get total count for pagination
+                $totalCount = $query->count();
+                
+                // Apply pagination
+                $offset = ($page - 1) * $perPage;
+                $customerAccounts = $query->offset($offset)->limit($perPage)->get();
 
-                Log::info('Customer accounts found', ['count' => $customerAccounts->count()]);
+                Log::info('Customer accounts found', ['count' => $customerAccounts->count(), 'total' => $totalCount]);
 
                 // Format the response
                 $formattedAccounts = $customerAccounts->map(function($customer) {
@@ -148,7 +156,7 @@ class AccountController extends Controller
                         'username' => $customer->username,
                         'email' => $customer->email,
                         'customer_type' => $customer->customer_type,
-                        'contact_number' => $customer->contact_number,
+                        'contact_number' => $customer->phone_number ?? $customer->contact_number ?? '', // Fix: use phone_number
                         'address' => $customer->address,
                         'account_number' => $customer->account_number,
                         'meter_number' => $customer->meter_number,
@@ -160,7 +168,12 @@ class AccountController extends Controller
                     'success' => true,
                     'data' => [
                         'data' => $formattedAccounts,
-                        'total' => $formattedAccounts->count()
+                        'total' => $totalCount,
+                        'per_page' => $perPage,
+                        'current_page' => $page,
+                        'last_page' => ceil($totalCount / $perPage),
+                        'from' => $offset + 1,
+                        'to' => min($offset + $perPage, $totalCount)
                     ]
                 ]);
             }
@@ -217,7 +230,7 @@ class AccountController extends Controller
                         'username' => $customer->username,
                         'email' => $customer->email,
                         'customer_type' => $customer->customer_type,
-                        'contact_number' => $customer->contact_number,
+                        'contact_number' => $customer->phone_number ?? $customer->contact_number ?? '', // Fix: use phone_number
                         'address' => $customer->address,
                         'account_number' => $customer->account_number,
                         'meter_number' => $customer->meter_number,
@@ -227,12 +240,22 @@ class AccountController extends Controller
 
                 // Merge both collections
                 $allAccounts = $formattedStaffAccounts->concat($formattedCustomerAccounts);
+                
+                // Apply pagination to the merged collection
+                $totalCount = $allAccounts->count();
+                $offset = ($page - 1) * $perPage;
+                $paginatedAccounts = $allAccounts->slice($offset, $perPage)->values();
 
                 return response()->json([
                     'success' => true,
                     'data' => [
-                        'data' => $allAccounts,
-                        'total' => $allAccounts->count()
+                        'data' => $paginatedAccounts,
+                        'total' => $totalCount,
+                        'per_page' => $perPage,
+                        'current_page' => $page,
+                        'last_page' => ceil($totalCount / $perPage),
+                        'from' => $offset + 1,
+                        'to' => min($offset + $perPage, $totalCount)
                     ]
                 ]);
             }
@@ -254,10 +277,14 @@ class AccountController extends Controller
                 $query->where('role', $type);
             }
 
-            // Get all staff accounts
-            $staffAccounts = $query->get();
+            // Get total count for pagination
+            $totalCount = $query->count();
+            
+            // Apply pagination
+            $offset = ($page - 1) * $perPage;
+            $staffAccounts = $query->offset($offset)->limit($perPage)->get();
 
-            Log::info('Staff accounts found', ['count' => $staffAccounts->count()]);
+            Log::info('Staff accounts found', ['count' => $staffAccounts->count(), 'total' => $totalCount]);
 
             // Format the response
             $formattedAccounts = $staffAccounts->map(function($staff) {
@@ -277,7 +304,12 @@ class AccountController extends Controller
                 'success' => true,
                 'data' => [
                     'data' => $formattedAccounts,
-                    'total' => $formattedAccounts->count()
+                    'total' => $totalCount,
+                    'per_page' => $perPage,
+                    'current_page' => $page,
+                    'last_page' => ceil($totalCount / $perPage),
+                    'from' => $offset + 1,
+                    'to' => min($offset + $perPage, $totalCount)
                 ]
             ]);
 
@@ -403,7 +435,7 @@ class AccountController extends Controller
                 'password' => $validated['password'],
                 'customer_type' => $validated['customer_type'],
                 'address' => $validated['address'],
-                'contact_number' => $validated['contact_number'],
+                'phone_number' => $validated['contact_number'], // Fix: use phone_number column
                 'email' => $validated['email'],
                 'account_number' => $validated['account_number'],
                 'meter_number' => $validated['meter_number'],
@@ -462,7 +494,7 @@ class AccountController extends Controller
                 'username' => $request->username,
                 'customer_type' => $request->customer_type,
                 'address' => $request->address,
-                'contact_number' => $request->contact_number,
+                'phone_number' => $request->contact_number, // Fix: use phone_number column
                 'email' => $request->email,
                 'account_number' => $request->account_number,
                 'meter_number' => $request->meter_number,

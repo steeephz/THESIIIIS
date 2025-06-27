@@ -16,6 +16,14 @@ const Accounts = () => {
     const { auth } = usePage().props;
     const [profilePicture, setProfilePicture] = useState(null);
     const [accounts, setAccounts] = useState([]);
+    const [pagination, setPagination] = useState({
+        current_page: 1,
+        last_page: 1,
+        per_page: 10,
+        total: 0,
+        from: 0,
+        to: 0
+    });
     const [showForm, setShowForm] = useState(false);
     const [formType, setFormType] = useState('staff');
     const [showPassword, setShowPassword] = useState(false);
@@ -132,13 +140,16 @@ const Accounts = () => {
             }
         };
         fetchProfileData();
-        fetchAccounts();
+        
+        // Reset to page 1 when changing tabs or search
+        setPagination(prev => ({ ...prev, current_page: 1 }));
+        fetchAccounts(1);
     }, [activeTab, searchTerm]);
 
-    const fetchAccounts = async () => {
+    const fetchAccounts = async (page = 1) => {
         try {
-            console.log('Fetching accounts with type:', activeTab);
-            const response = await axios.get(`/api/accounts?type=${activeTab}&search=${searchTerm}`);
+            console.log('Fetching accounts with type:', activeTab, 'page:', page);
+            const response = await axios.get(`/api/accounts?type=${activeTab}&search=${searchTerm}&page=${page}`);
             console.log('API Response:', response.data);
             
             if (response.data.success) {
@@ -148,10 +159,29 @@ const Accounts = () => {
                     role: account.role?.toLowerCase().trim()
                 }));
                 setAccounts(processedAccounts);
+                
+                // Update pagination state
+                setPagination({
+                    current_page: response.data.data.current_page,
+                    last_page: response.data.data.last_page,
+                    per_page: response.data.data.per_page,
+                    total: response.data.data.total,
+                    from: response.data.data.from,
+                    to: response.data.data.to
+                });
+                
                 console.log('Updated accounts state:', processedAccounts);
+                console.log('Updated pagination state:', response.data.data);
+            } else {
+                console.error('API returned success=false:', response.data.message);
+                setAccounts([]);
+                setPagination(prev => ({ ...prev, total: 0 }));
             }
         } catch (error) {
             console.error('Error fetching accounts:', error);
+            console.error('Error details:', error.response?.data);
+            setAccounts([]);
+            setPagination(prev => ({ ...prev, total: 0 }));
         }
     };
 
@@ -368,6 +398,7 @@ const Accounts = () => {
                 if (editingAccount) {
                     response = await axios.put(`/api/accounts/customer/${editingAccount.id}`, customerData);
                 } else {
+                    // Use the correct customer creation endpoint
                     response = await axios.post('/api/accounts/customer', customerData);
                 }
             }
@@ -438,6 +469,24 @@ const Accounts = () => {
         setFormType(type);
         clearFormData();
         setShowForm(true);
+    };
+
+    const handlePageChange = (page) => {
+        if (page >= 1 && page <= pagination.last_page) {
+            fetchAccounts(page);
+        }
+    };
+
+    const handlePreviousPage = () => {
+        if (pagination.current_page > 1) {
+            handlePageChange(pagination.current_page - 1);
+        }
+    };
+
+    const handleNextPage = () => {
+        if (pagination.current_page < pagination.last_page) {
+            handlePageChange(pagination.current_page + 1);
+        }
     };
 
     const renderForm = () => {
@@ -895,6 +944,97 @@ const Accounts = () => {
                             </tbody>
                         </table>
                     </div>
+                    
+                    {/* Pagination Controls */}
+                    {pagination.total > 0 && (
+                        <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-6">
+                            <div className="flex flex-1 justify-between sm:hidden">
+                                <button
+                                    onClick={handlePreviousPage}
+                                    disabled={pagination.current_page === 1}
+                                    className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Previous
+                                </button>
+                                <button
+                                    onClick={handleNextPage}
+                                    disabled={pagination.current_page === pagination.last_page}
+                                    className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                                <div>
+                                    <p className="text-sm text-gray-700">
+                                        Showing{' '}
+                                        <span className="font-medium">{pagination.from}</span> to{' '}
+                                        <span className="font-medium">{pagination.to}</span> of{' '}
+                                        <span className="font-medium">{pagination.total}</span> results
+                                    </p>
+                                </div>
+                                <div>
+                                    <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                                        <button
+                                            onClick={handlePreviousPage}
+                                            disabled={pagination.current_page === 1}
+                                            className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <span className="sr-only">Previous</span>
+                                            <span className="material-symbols-outlined text-sm">chevron_left</span>
+                                        </button>
+                                        
+                                        {/* Page Numbers */}
+                                        {Array.from({ length: pagination.last_page }, (_, i) => i + 1).map((page) => {
+                                            // Show first page, last page, current page, and pages around current page
+                                            const showPage = page === 1 || 
+                                                            page === pagination.last_page || 
+                                                            Math.abs(page - pagination.current_page) <= 1;
+                                            
+                                            if (!showPage) {
+                                                // Show ellipsis
+                                                if ((page === 2 && pagination.current_page > 4) || 
+                                                    (page === pagination.last_page - 1 && pagination.current_page < pagination.last_page - 3)) {
+                                                    return (
+                                                        <span
+                                                            key={page}
+                                                            className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 ring-1 ring-inset ring-gray-300"
+                                                        >
+                                                            ...
+                                                        </span>
+                                                    );
+                                                }
+                                                return null;
+                                            }
+                                            
+                                            return (
+                                                <button
+                                                    key={page}
+                                                    onClick={() => handlePageChange(page)}
+                                                    className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
+                                                        page === pagination.current_page
+                                                            ? 'z-10 bg-blue-600 text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600'
+                                                            : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'
+                                                    }`}
+                                                >
+                                                    {page}
+                                                </button>
+                                            );
+                                        })}
+                                        
+                                        <button
+                                            onClick={handleNextPage}
+                                            disabled={pagination.current_page === pagination.last_page}
+                                            className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <span className="sr-only">Next</span>
+                                            <span className="material-symbols-outlined text-sm">chevron_right</span>
+                                        </button>
+                                    </nav>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Create Account Form Modal */}

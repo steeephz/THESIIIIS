@@ -47,11 +47,9 @@ Route::middleware(['web'])->group(function () {
         Route::post('/staff', [AccountController::class, 'createStaffAccount']);
         Route::put('/staff/{id}', [AccountController::class, 'updateStaff']);
         Route::delete('/staff/{id}', [AccountController::class, 'deleteStaff']);
-        Route::post('/customer', [AccountController::class, 'createCustomerAccount']);
-        Route::post('/customer', [AccountController::class, 'createCustomer']);
+        Route::post('/customer', [AccountController::class, 'createCustomer']); // Use the newer createCustomer method
         Route::put('/customer/{id}', [AccountController::class, 'updateCustomer']);
         Route::delete('/customer/{id}', [AccountController::class, 'deleteCustomer']);
-        Route::post('/accounts/customer', [CustomerController::class, 'store']);
     });
 
     // Bill Handler Routes
