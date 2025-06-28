@@ -13,6 +13,9 @@ use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\BillPaymentValidationController;
+use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\MeterReadingController;
+use App\Http\Controllers\BillingCycleController;
 
 /*
 |--------------------------------------------------------------------------
@@ -86,6 +89,102 @@ Route::middleware(['web'])->group(function () {
     // Bill Payment Validation Routes
     Route::get('/bill-payment-validation', [BillPaymentValidationController::class, 'index']);
     Route::patch('/bill-payment-validation/{id}/status', [BillPaymentValidationController::class, 'updateStatus']);
+
+    // Invoice Routes
+    Route::prefix('invoices')->group(function () {
+        Route::get('/', [InvoiceController::class, 'index']);
+        Route::post('/', [InvoiceController::class, 'store']);
+        Route::post('/bulk-generate', [InvoiceController::class, 'bulkGenerate']);
+        Route::get('/{invoice}', [InvoiceController::class, 'show']);
+        Route::put('/{invoice}', [InvoiceController::class, 'update']);
+        Route::delete('/{invoice}', [InvoiceController::class, 'destroy']);
+    });
+
+    // Get customers for invoice generation
+    Route::get('/customers', [CustomerController::class, 'index']);
+
+    // Meter Reading Routes
+    Route::prefix('meter-readings')->group(function () {
+        Route::get('/', [MeterReadingController::class, 'index']);
+        Route::post('/', [MeterReadingController::class, 'store']);
+        Route::get('/{id}/with-customer', [MeterReadingController::class, 'getWithCustomer']);
+        Route::get('/{meterReading}', [MeterReadingController::class, 'show']);
+        Route::put('/{meterReading}', [MeterReadingController::class, 'update']);
+        Route::delete('/{meterReading}', [MeterReadingController::class, 'destroy']);
+    });
+
+    // Billing Cycle Routes
+    Route::prefix('billing-cycles')->group(function () {
+        Route::get('/', [BillingCycleController::class, 'index']);
+        Route::post('/generate', [BillingCycleController::class, 'generateFromCustomers']);
+        Route::get('/periods', [BillingCycleController::class, 'getBillingPeriods']);
+        Route::get('/statistics', [BillingCycleController::class, 'getStatistics']);
+        Route::get('/{billingCycle}', [BillingCycleController::class, 'show']);
+        Route::put('/{billingCycle}', [BillingCycleController::class, 'update']);
+        Route::delete('/{billingCycle}', [BillingCycleController::class, 'destroy']);
+    });
+
+    // Simple test route for meter readings
+    Route::get('/test-meter-readings', function() {
+        try {
+            $readings = \DB::table('meter_readings')->get();
+            return response()->json([
+                'success' => true,
+                'count' => $readings->count(),
+                'data' => $readings
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]);
+        }
+    });
+
+    // Debug route to test the join between meter_readings and customers_tb
+    Route::get('/debug/meter-customer-join/{id}', function($id) {
+        try {
+            // First, get the meter reading
+            $meterReading = \DB::table('meter_readings')->where('id', $id)->first();
+            
+            if (!$meterReading) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Meter reading not found',
+                    'id' => $id
+                ]);
+            }
+
+            // Check if customer exists with the same meter_number
+            $customer = \DB::table('customers_tb')->where('meter_number', $meterReading->meter_number)->first();
+            
+            // Try the join
+            $joinResult = \DB::table('meter_readings')
+                ->join('customers_tb', 'meter_readings.meter_number', '=', 'customers_tb.meter_number')
+                ->where('meter_readings.id', $id)
+                ->select(
+                    'meter_readings.*',
+                    'customers_tb.full_name',
+                    'customers_tb.address',
+                    'customers_tb.account_number'
+                )
+                ->first();
+
+            return response()->json([
+                'success' => true,
+                'meter_reading' => $meterReading,
+                'customer' => $customer,
+                'join_result' => $joinResult,
+                'meter_number_from_reading' => $meterReading->meter_number ?? null
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    });
 });
 
 // Temporary debug routes
@@ -103,6 +202,24 @@ Route::get('/debug/check-staff', function() {
         'staff' => $staff,
         'count' => $staff->count()
     ]);
+});
+
+Route::get('/debug/check-meter-readings', function() {
+    try {
+        $readings = DB::table('meter_readings')->get();
+        return response()->json([
+            'status' => 'success',
+            'readings' => $readings,
+            'count' => $readings->count(),
+            'connection' => DB::connection()->getName()
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage(),
+            'connection' => DB::connection()->getName()
+        ]);
+    }
 });
 
 

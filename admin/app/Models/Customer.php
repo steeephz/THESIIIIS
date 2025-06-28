@@ -9,17 +9,29 @@ class Customer extends Model
 {
     use HasFactory;
 
+    protected $table = 'customers_tb';
+
     protected $fillable = [
-        'user_id',
+        'first_name',
+        'last_name',
+        'full_name',
+        'username',
+        'password',
         'customer_type',
-        'account_number',
         'address',
-        'contact_number',
+        'phone_number',
+        'email',
+        'account_number',
         'meter_number'
     ];
 
-    public function user()
+    protected $hidden = [
+        'password',
+    ];
+
+    // Relationship with meter readings
+    public function meterReadings()
     {
-        return $this->belongsTo(User::class);
+        return $this->hasMany(MeterReading::class, 'customer_id');
     }
 } 

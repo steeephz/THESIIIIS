@@ -1,0 +1,185 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\MeterReading;
+use App\Models\Customer;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+
+class MeterReadingController extends Controller
+{
+    /**
+     * Display a listing of meter readings with all data from Supabase.
+     */
+    public function index(Request $request): JsonResponse
+    {
+        try {
+            // Get all fields that actually exist in the Supabase meter_readings table
+            $meterReadings = \DB::table('meter_readings')
+                ->select(
+                    'id',
+                    'meter_number',
+                    'reading_value',
+                    'amount',
+                    'remarks',
+                    'reading_date',
+                    'created_at',
+                    'staff_id'
+                )
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            return response()->json($meterReadings);
+        } catch (\Exception $e) {
+            \Log::error('Meter readings error: ' . $e->getMessage());
+            return response()->json([]);
+        }
+    }
+
+    /**
+     * Store a newly created meter reading.
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'customer_id' => 'required|exists:customers_tb,id',
+            'meter_number' => 'required|string|max:50',
+            'reading_date' => 'required|date',
+            'previous_reading' => 'required|integer|min:0',
+            'current_reading' => 'required|integer|min:0',
+            'rate_id' => 'nullable|exists:rates_tb,id',
+            'remarks' => 'nullable|string',
+        ]);
+
+        // Calculate consumption
+        $consumption = max(0, $validated['current_reading'] - $validated['previous_reading']);
+        
+        // Calculate amount (you might want to get rate from rates table)
+        $amount = $consumption * 25; // Default rate, should be fetched from rates table
+
+        $meterReading = MeterReading::create([
+            'customer_id' => $validated['customer_id'],
+            'meter_number' => $validated['meter_number'],
+            'reading_date' => $validated['reading_date'],
+            'previous_reading' => $validated['previous_reading'],
+            'current_reading' => $validated['current_reading'],
+            'consumption' => $consumption,
+            'rate_id' => $validated['rate_id'],
+            'amount' => $amount,
+            'status' => 'Recorded',
+            'remarks' => $validated['remarks'],
+        ]);
+
+        $meterReading->load('customer');
+
+        return response()->json($meterReading, 201);
+    }
+
+    /**
+     * Display the specified meter reading.
+     */
+    public function show(MeterReading $meterReading): JsonResponse
+    {
+        $meterReading->load('customer');
+        
+        // Add customer data for frontend compatibility
+        if ($meterReading->customer) {
+            $meterReading->customer_name = $meterReading->customer->name;
+            $meterReading->account_number = $meterReading->customer->account_number;
+            $meterReading->account_type = $meterReading->customer->account_type;
+        }
+
+        return response()->json($meterReading);
+    }
+
+    /**
+     * Update the specified meter reading.
+     */
+    public function update(Request $request, MeterReading $meterReading): JsonResponse
+    {
+        $validated = $request->validate([
+            'status' => 'sometimes|in:Recorded,Invoiced,Corrected',
+            'remarks' => 'sometimes|string',
+            'current_reading' => 'sometimes|integer|min:0',
+        ]);
+
+        // Recalculate consumption if current_reading is updated
+        if (isset($validated['current_reading'])) {
+            $validated['consumption'] = max(0, $validated['current_reading'] - $meterReading->previous_reading);
+            $validated['amount'] = $validated['consumption'] * 25; // Update with proper rate
+        }
+
+        $meterReading->update($validated);
+        $meterReading->load('customer');
+
+        return response()->json($meterReading);
+    }
+
+    /**
+     * Remove the specified meter reading.
+     */
+    public function destroy(MeterReading $meterReading): JsonResponse
+    {
+        $meterReading->delete();
+
+        return response()->json(['message' => 'Meter reading deleted successfully']);
+    }
+
+    /**
+     * Get meter reading with customer information for invoice generation.
+     */
+    public function getWithCustomer($id): JsonResponse
+    {
+        try {
+            \Log::info('Getting meter reading with customer for ID: ' . $id);
+            
+            // First check if meter reading exists
+            $meterReading = \DB::table('meter_readings')->where('id', $id)->first();
+            
+            if (!$meterReading) {
+                \Log::error('Meter reading not found for ID: ' . $id);
+                return response()->json(['error' => 'Meter reading not found'], 404);
+            }
+
+            \Log::info('Meter reading found: ' . json_encode($meterReading));
+
+            // Check if customer exists with this meter number
+            $customer = \DB::table('customers_tb')->where('meter_number', $meterReading->meter_number)->first();
+            
+            if (!$customer) {
+                \Log::error('No customer found with meter_number: ' . $meterReading->meter_number);
+                return response()->json([
+                    'error' => 'No customer found with meter number: ' . $meterReading->meter_number,
+                    'meter_reading' => $meterReading
+                ], 404);
+            }
+
+            // Perform the join
+            $result = \DB::table('meter_readings')
+                ->join('customers_tb', 'meter_readings.meter_number', '=', 'customers_tb.meter_number')
+                ->where('meter_readings.id', $id)
+                ->select(
+                    'meter_readings.*',
+                    'customers_tb.full_name',
+                    'customers_tb.address',
+                    'customers_tb.account_number'
+                )
+                ->first();
+
+            if (!$result) {
+                \Log::error('Join failed for meter reading ID: ' . $id . ' with meter_number: ' . $meterReading->meter_number);
+                return response()->json(['error' => 'Failed to join customer data'], 500);
+            }
+
+            \Log::info('Successfully retrieved meter reading with customer data');
+            return response()->json($result);
+        } catch (\Exception $e) {
+            \Log::error('Get meter reading with customer error: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return response()->json([
+                'error' => 'Failed to retrieve data: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+} 
