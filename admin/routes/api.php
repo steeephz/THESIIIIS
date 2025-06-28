@@ -13,6 +13,7 @@ use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\BillPaymentValidationController;
+use App\Http\Controllers\MeterReadingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -30,6 +31,9 @@ Route::post('/admin-login', [AdminAuthController::class, 'login']);
 Route::post('/admin-logout', [AdminAuthController::class, 'logout']);
 Route::get('/check-auth', [AdminAuthController::class, 'checkAuth'])->middleware(['web']);
 Route::post('/create-staff', [AdminAuthController::class, 'createStaff']);
+
+// Temporary public routes (for testing)
+Route::get('/meter-readings', [MeterReadingController::class, 'index']);
 
 // Protected routes
 Route::middleware(['web'])->group(function () {
@@ -69,6 +73,7 @@ Route::middleware(['web'])->group(function () {
     Route::post('/announcements', [AnnouncementController::class, 'store']);
     Route::put('/announcements/{id}', [AnnouncementController::class, 'update']);
     Route::delete('/announcements/{id}', [AnnouncementController::class, 'destroy']);
+    Route::get('/announcements/history', [AnnouncementController::class, 'history']);
 
     // Payment Routes
     Route::prefix('payments')->group(function () {
@@ -104,5 +109,9 @@ Route::get('/debug/check-staff', function() {
         'count' => $staff->count()
     ]);
 });
+
+
+
+
 
 

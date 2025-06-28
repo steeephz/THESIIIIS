@@ -189,6 +189,71 @@ Route::get('/debug-db', function () {
     }
 });
 
+// Simple public test for meter readings (no auth required)
+Route::get('/public-test-meter', function () {
+    try {
+        // Test basic database connection
+        $dbTest = DB::select('SELECT 1 as test');
+        
+        // Test if meter_readings table exists
+        $tableExists = DB::select("SELECT table_name FROM information_schema.tables WHERE table_name = 'meter_readings'");
+        
+        // Try to count records
+        $count = DB::table('meter_readings')->count();
+        
+        // Get first record if any
+        $firstRecord = DB::table('meter_readings')->first();
+        
+        return response()->json([
+            'success' => true,
+            'database_connection' => !empty($dbTest),
+            'table_exists' => !empty($tableExists),
+            'record_count' => $count,
+            'first_record' => $firstRecord,
+            'message' => 'Database tests completed'
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+            'line' => $e->getLine(),
+            'file' => $e->getFile()
+        ], 500);
+    }
+});
+
+// Test meter readings API directly
+Route::get('/test-meter-readings', function () {
+    try {
+        $meterReadings = DB::table('meter_readings')
+            ->select([
+                'id',
+                'meter_number',
+                'reading_value',
+                'amount',
+                'remarks',
+                'reading_date',
+                'created_at',
+                'staff_id'
+            ])
+            ->get();
+            
+        return response()->json([
+            'success' => true,
+            'data' => $meterReadings,
+            'count' => $meterReadings->count(),
+            'message' => 'Simple meter readings query successful'
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+            'line' => $e->getLine(),
+            'file' => $e->getFile()
+        ], 500);
+    }
+});
+
 // Test announcements API directly
 Route::get('/test-announcements', function () {
     try {
