@@ -261,18 +261,13 @@ const BillHandlerBilling = () => {
     setReadingLoading(true);
     try {
       const response = await fetch('/api/meter-readings');
-      console.log('Response status:', response.status);
-      
       if (response.ok) {
         const data = await response.json();
-        console.log('Meter readings data:', data);
-        setMeterReadings(Array.isArray(data) ? data : []);
+        setMeterReadings(Array.isArray(data.data) ? data.data : []);
       } else {
-        console.error('HTTP error:', response.status, response.statusText);
         setMeterReadings([]);
       }
     } catch (err) {
-      console.error('Fetch error:', err);
       setMeterReadings([]);
     } finally {
       setReadingLoading(false);
@@ -524,22 +519,21 @@ const BillHandlerBilling = () => {
   async function handleGenerateInvoice(readingId) {
     setLoadingInvoiceId(readingId);
     try {
-      console.log('Generating invoice for reading ID:', readingId);
       const response = await fetch(`/api/meter-readings/${readingId}/with-customer`);
-      console.log('Response status:', response.status);
-      
       if (response.ok) {
-        const data = await response.json();
-        console.log('Invoice data:', data);
-        setInvoiceData(data);
-        setShowInvoiceModal(true);
+        const result = await response.json();
+        console.log('Invoice API result:', result);
+        if (result.success && result.data) {
+          setInvoiceData(result.data);
+          setShowInvoiceModal(true);
+        } else {
+          alert(result.message || 'Failed to fetch invoice data');
+        }
       } else {
         const errorText = await response.text();
-        console.error('API Error:', response.status, errorText);
         alert(`Failed to fetch customer data. Status: ${response.status}. Error: ${errorText}`);
       }
     } catch (error) {
-      console.error('Error generating invoice:', error);
       alert('Error generating invoice. Please try again.');
     } finally {
       setLoadingInvoiceId(null);
@@ -652,7 +646,7 @@ const BillHandlerBilling = () => {
                                 View
                               </button>
                               <button
-                                onClick={() => handleGenerateInvoice(reading)}
+                                onClick={() => handleGenerateInvoice(reading.id)}
                                 className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-xs"
                               >
                                 Generate Invoice
@@ -688,39 +682,121 @@ const BillHandlerBilling = () => {
                 )}
 
                 {/* Generate Invoice Modal */}
-                {showInvoiceModal && selectedReading && (
+                {showInvoiceModal && invoiceData && (
                   <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                       <div className="bg-blue-600 text-white p-6 text-center">
                         <h1 className="text-2xl font-bold">HERMOSA WATER DISTRICT</h1>
                         <h2 className="text-lg">WATER BILL INVOICE</h2>
                         <div className="mt-2 text-sm">
-                          Invoice #: INV-{selectedReading.id} | Date: {formatDate(new Date())}
+                          Invoice #: INV-{invoiceData.meter_reading.id} | Date: {formatDate(new Date())}
                         </div>
                       </div>
                       <div className="p-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                           <div>
-                            <h3 className="text-lg font-semibold text-blue-600 mb-3">Meter Reading Information</h3>
+                            <h3 className="text-lg font-semibold text-blue-600 mb-3">Customer Information</h3>
                             <div className="space-y-2">
-                              <div><strong>ID:</strong> {selectedReading.id}</div>
-                              <div><strong>Meter Number:</strong> {selectedReading.meter_number}</div>
-                              <div><strong>Reading Value:</strong> {selectedReading.reading_value}</div>
-                              <div><strong>Amount:</strong> ₱{selectedReading.amount}</div>
-                              <div><strong>Reading Date:</strong> {formatDate(selectedReading.reading_date)}</div>
-                              <div><strong>Staff ID:</strong> {selectedReading.staff_id}</div>
+                              <div><strong>Name:</strong> {invoiceData.customer.full_name}</div>
+                              <div><strong>Address:</strong> {invoiceData.customer.address}</div>
+                              <div><strong>Account Number:</strong> {invoiceData.customer.account_number}</div>
+                              <div><strong>Contact Number:</strong> {invoiceData.customer.contact_number}</div>
+                              <div><strong>Customer Type:</strong> {invoiceData.customer.customer_type}</div>
                             </div>
                           </div>
                           <div>
-                            <h3 className="text-lg font-semibold text-blue-600 mb-3">Breakdown</h3>
+                            <h3 className="text-lg font-semibold text-blue-600 mb-3">Billing Period</h3>
                             <div className="space-y-2">
-                              <div><strong>Basic Charge:</strong> ₱30.00</div>
-                              <div><strong>Usage Charge:</strong> ₱{selectedReading.amount}</div>
-                              <div><strong>Other Fees:</strong> ₱0.00</div>
-                              <div className="font-bold text-blue-700">Total: ₱{selectedReading.amount}</div>
+                              <div><strong>From:</strong> {formatDate(invoiceData.meter_reading.reading_date)}</div>
+                              <div><strong>To:</strong> {formatDate(invoiceData.meter_reading.reading_date)}</div>
+                              <div><strong>Due Date:</strong> <span className="text-red-600 font-bold">{formatDate(dayjs(invoiceData.meter_reading.reading_date).add(15, 'day'))}</span></div>
+                              <div><strong>Rate:</strong> {invoiceData.customer.customer_type}</div>
                             </div>
                           </div>
                         </div>
+                        <div className="border-t pt-4 mb-4">
+                          <h3 className="text-lg font-semibold text-blue-600 mb-3">Water Consumption</h3>
+                          <div className="grid grid-cols-3 text-center">
+                            <div>
+                              <div className="text-gray-500">Previous Reading</div>
+                              <div className="text-xl font-bold">{invoiceData.meter_reading.reading_value}</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500">Current Reading</div>
+                              <div className="text-xl font-bold">{invoiceData.meter_reading.reading_value}</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500">Total Usage</div>
+                              <div className="text-xl font-bold">{invoiceData.meter_reading.reading_value} m³</div>
+                            </div>
+                          </div>
+                        </div>
+                        {(() => {
+                          // Use reading_value as total usage
+                          const usage = parseFloat(invoiceData.meter_reading.reading_value) || 0;
+                          let remaining = usage;
+                          let breakdown = [];
+                          let subtotal = 0;
+                          // Basic Service Charge
+                          breakdown.push({ desc: 'Basic Service Charge', qty: '1 month', rate: 185, amount: 185 });
+                          subtotal += 185;
+                          // Water Usage (1-10 m³)
+                          let tier1 = Math.min(10, remaining);
+                          if (tier1 > 0) {
+                            let amt = tier1 * 15.5;
+                            breakdown.push({ desc: 'Water Usage (1-10 m³)', qty: `${tier1} m³`, rate: 15.5, amount: amt });
+                            subtotal += amt;
+                            remaining -= tier1;
+                          }
+                          // Water Usage (11-20 m³)
+                          let tier2 = Math.min(10, remaining);
+                          if (tier2 > 0) {
+                            let amt = tier2 * 17.25;
+                            breakdown.push({ desc: 'Water Usage (11-20 m³)', qty: `${tier2} m³`, rate: 17.25, amount: amt });
+                            subtotal += amt;
+                            remaining -= tier2;
+                          }
+                          // Water Usage (21-30 m³)
+                          let tier3 = Math.min(10, remaining);
+                          if (tier3 > 0) {
+                            let amt = tier3 * 19.0;
+                            breakdown.push({ desc: 'Water Usage (21-30 m³)', qty: `${tier3} m³`, rate: 19.0, amount: amt });
+                            subtotal += amt;
+                            remaining -= tier3;
+                          }
+                          // Environmental Fee
+                          let envFee = usage * 0.5;
+                          breakdown.push({ desc: 'Environmental Fee', qty: `${usage} m³`, rate: 0.5, amount: envFee });
+                          subtotal += envFee;
+                          return (
+                            <div>
+                              <h3 className="text-lg font-semibold text-blue-600 mb-3">Charges Breakdown</h3>
+                              <table className="min-w-full text-sm mb-2">
+                                <thead>
+                                  <tr>
+                                    <th className="text-left">Description</th>
+                                    <th className="text-right">Quantity</th>
+                                    <th className="text-right">Rate</th>
+                                    <th className="text-right">Amount</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {breakdown.map((row, idx) => (
+                                    <tr key={idx}>
+                                      <td>{row.desc}</td>
+                                      <td className="text-right">{row.qty}</td>
+                                      <td className="text-right">₱{row.rate.toFixed(2)}</td>
+                                      <td className="text-right font-bold">₱{row.amount.toFixed(2)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                              <div className="flex justify-end text-lg font-bold">
+                                Subtotal: ₱{subtotal.toFixed(2)}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3">
                         <button 
