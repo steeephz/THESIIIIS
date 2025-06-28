@@ -181,19 +181,14 @@ const Profile = () => {
                     profile_picture: null // Reset the file input
                 }));
                 
-                // Force image refresh with cache busting
+                // Set the new profile picture with cache busting
                 if (updatedProfile.data.profile_picture) {
-                    const newImageUrl = updatedProfile.data.profile_picture + '?t=' + new Date().getTime();
-                    console.log('Setting new preview image:', newImageUrl);
-                    setPreviewImage(newImageUrl);
-                    
-                    // Force image reload by clearing and resetting
+                    // Add a small delay to ensure file is fully written to storage
                     setTimeout(() => {
-                        setPreviewImage(null);
-                        setTimeout(() => {
-                            setPreviewImage(newImageUrl);
-                        }, 100);
-                    }, 100);
+                        const newImageUrl = updatedProfile.data.profile_picture + '?t=' + new Date().getTime();
+                        console.log('Setting new preview image:', newImageUrl);
+                        setPreviewImage(newImageUrl);
+                    }, 200);
                 } else {
                     console.log('No profile picture in response, keeping current preview');
                 }

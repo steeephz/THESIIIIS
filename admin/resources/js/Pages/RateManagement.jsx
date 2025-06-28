@@ -174,7 +174,7 @@ const RateManagement = () => {
 
         <div className="lg:ml-[240px] p-3 sm:p-4 md:p-6 lg:p-6 pt-16 lg:pt-6">
           <h1 className="text-xl font-semibold mb-8">Rate Management</h1>
-          <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-md p-10">
+          <div className="bg-white rounded-xl shadow-md p-10">
             {/* Notification */}
             {notification.show && (
               <Notification

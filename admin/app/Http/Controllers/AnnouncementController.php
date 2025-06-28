@@ -138,4 +138,59 @@ class AnnouncementController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get all announcements for history report (both active and inactive)
+     */
+    public function history(Request $request)
+    {
+        try {
+            $query = DB::table('announcements_tb')
+                ->select([
+                    'id',
+                    'title',
+                    'body',
+                    'status',
+                    'staff_id',
+                    'posted_by',
+                    'published_at',
+                    'expired_at',
+                    'created_at',
+                    'updated_at',
+                    'duration',
+                    'type',
+                    'priority'
+                ]);
+
+            // Filter by status if provided
+            if ($request->has('status') && $request->status !== 'All') {
+                $query->where('status', $request->status);
+            }
+
+            // Add search functionality
+            if ($request->has('search') && $request->search !== '') {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('title', 'like', "%$search%")
+                      ->orWhere('body', 'like', "%$search%")
+                      ->orWhere('posted_by', 'like', "%$search%");
+                });
+            }
+
+            // Add pagination
+            $perPage = $request->get('per_page', 10);
+            $announcements = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => $announcements
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch announcement history: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 } 

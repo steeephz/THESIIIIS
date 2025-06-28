@@ -34,6 +34,9 @@ Route::post('/admin-logout', [AdminAuthController::class, 'logout']);
 Route::get('/check-auth', [AdminAuthController::class, 'checkAuth'])->middleware(['web']);
 Route::post('/create-staff', [AdminAuthController::class, 'createStaff']);
 
+// Temporary public routes (for testing)
+Route::get('/meter-readings', [MeterReadingController::class, 'index']);
+
 // Protected routes
 Route::middleware(['web'])->group(function () {
     Route::get('/user', function (Request $request) {
@@ -72,6 +75,7 @@ Route::middleware(['web'])->group(function () {
     Route::post('/announcements', [AnnouncementController::class, 'store']);
     Route::put('/announcements/{id}', [AnnouncementController::class, 'update']);
     Route::delete('/announcements/{id}', [AnnouncementController::class, 'destroy']);
+    Route::get('/announcements/history', [AnnouncementController::class, 'history']);
 
     // Payment Routes
     Route::prefix('payments')->group(function () {
@@ -221,5 +225,9 @@ Route::get('/debug/check-meter-readings', function() {
         ]);
     }
 });
+
+
+
+
 
 

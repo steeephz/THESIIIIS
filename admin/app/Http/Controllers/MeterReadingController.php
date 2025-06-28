@@ -6,6 +6,7 @@ use App\Models\MeterReading;
 use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class MeterReadingController extends Controller
 {
@@ -15,25 +16,47 @@ class MeterReadingController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            // Get all fields that actually exist in the Supabase meter_readings table
-            $meterReadings = \DB::table('meter_readings')
-                ->select(
-                    'id',
-                    'meter_number',
-                    'reading_value',
-                    'amount',
-                    'remarks',
-                    'reading_date',
-                    'created_at',
-                    'staff_id'
-                )
-                ->orderBy('created_at', 'desc')
-                ->get();
+            $accountType = $request->get('accountType', 'All');
+            $page = $request->get('page', 1);
+            $perPage = $request->get('per_page', 10);
 
-            return response()->json($meterReadings);
+            // Build the base query
+            $query = DB::table('meter_readings')
+                ->leftJoin('customers_tb', 'meter_readings.meter_number', '=', 'customers_tb.meter_number')
+                ->select(
+                    'meter_readings.id',
+                    'meter_readings.meter_number',
+                    'meter_readings.reading_value',
+                    'meter_readings.amount',
+                    'meter_readings.remarks',
+                    'meter_readings.reading_date',
+                    'meter_readings.created_at',
+                    'meter_readings.staff_id',
+                    'customers_tb.full_name as customer_name',
+                    'customers_tb.account_number',
+                    'customers_tb.account_type'
+                );
+
+            // Apply account type filter if specified
+            if ($accountType !== 'All') {
+                $query->where('customers_tb.account_type', $accountType);
+            }
+
+            // Get paginated results
+            $meterReadings = $query->orderBy('meter_readings.created_at', 'desc')
+                ->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => $meterReadings
+            ]);
         } catch (\Exception $e) {
             \Log::error('Meter readings error: ' . $e->getMessage());
-            return response()->json([]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch meter readings',
+                'data' => []
+            ]);
         }
     }
 
@@ -135,7 +158,7 @@ class MeterReadingController extends Controller
             \Log::info('Getting meter reading with customer for ID: ' . $id);
             
             // First check if meter reading exists
-            $meterReading = \DB::table('meter_readings')->where('id', $id)->first();
+            $meterReading = DB::table('meter_readings')->where('id', $id)->first();
             
             if (!$meterReading) {
                 \Log::error('Meter reading not found for ID: ' . $id);
@@ -145,7 +168,7 @@ class MeterReadingController extends Controller
             \Log::info('Meter reading found: ' . json_encode($meterReading));
 
             // Check if customer exists with this meter number
-            $customer = \DB::table('customers_tb')->where('meter_number', $meterReading->meter_number)->first();
+            $customer = DB::table('customers_tb')->where('meter_number', $meterReading->meter_number)->first();
             
             if (!$customer) {
                 \Log::error('No customer found with meter_number: ' . $meterReading->meter_number);
@@ -156,7 +179,7 @@ class MeterReadingController extends Controller
             }
 
             // Perform the join
-            $result = \DB::table('meter_readings')
+            $result = DB::table('meter_readings')
                 ->join('customers_tb', 'meter_readings.meter_number', '=', 'customers_tb.meter_number')
                 ->where('meter_readings.id', $id)
                 ->select(
