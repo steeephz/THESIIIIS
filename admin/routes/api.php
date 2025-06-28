@@ -121,6 +121,8 @@ Route::middleware(['web'])->group(function () {
     Route::prefix('billing-cycles')->group(function () {
         Route::get('/', [BillingCycleController::class, 'index']);
         Route::post('/generate', [BillingCycleController::class, 'generateFromCustomers']);
+        Route::post('/create-for-all-customers', [BillingCycleController::class, 'createBillingCyclesForAllCustomers']);
+        Route::post('/sync-customer/{customerId}', [BillingCycleController::class, 'syncBillingCycleForCustomer']);
         Route::get('/periods', [BillingCycleController::class, 'getBillingPeriods']);
         Route::get('/statistics', [BillingCycleController::class, 'getStatistics']);
         Route::get('/{billingCycle}', [BillingCycleController::class, 'show']);

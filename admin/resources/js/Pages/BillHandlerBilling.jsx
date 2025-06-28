@@ -199,21 +199,12 @@ const BillHandlerBilling = () => {
   const [loading, setLoading] = useState(false);
 
   const [cycleAccountType, setCycleAccountType] = useState('All');
-  const [cyclePeriod, setCyclePeriod] = useState('2024-06');
+  const [cyclePeriod, setCyclePeriod] = useState('');
   const [cycles, setCycles] = useState([]);
   const [cycleSearch, setCycleSearch] = useState('');
   const [cycleLoading, setCycleLoading] = useState(false);
-  const [showCycleModal, setShowCycleModal] = useState(false);
-  const [showRemarksModal, setShowRemarksModal] = useState(false);
-  const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [selectedCycle, setSelectedCycle] = useState(null);
-  const [newCyclePeriod, setNewCyclePeriod] = useState('');
-  const [cycleReason, setCycleReason] = useState(cycleReasons[0]);
-  const [newRemarks, setNewRemarks] = useState('');
-  const [generatePeriod, setGeneratePeriod] = useState('');
-  const [generateDueDays, setGenerateDueDays] = useState(15);
-  const [generateOverwrite, setGenerateOverwrite] = useState(false);
-  const [generateLoading, setGenerateLoading] = useState(false);
+  const [showCycleDetailsModal, setShowCycleDetailsModal] = useState(false);
 
   const [historyAccountType, setHistoryAccountType] = useState('All');
   const [historyPeriod, setHistoryPeriod] = useState('');
@@ -230,8 +221,6 @@ const BillHandlerBilling = () => {
 
   const [showBillDetailsModal, setShowBillDetailsModal] = useState(false);
   const [selectedBill, setSelectedBill] = useState(null);
-
-  const [showCycleDetailsModal, setShowCycleDetailsModal] = useState(false);
 
   // Invoice Generation states (simplified meter readings)
   const [meterReadings, setMeterReadings] = useState([]);
@@ -294,6 +283,21 @@ const BillHandlerBilling = () => {
   const fetchBillingCycles = async () => {
     setCycleLoading(true);
     try {
+      // First, automatically sync all customers to billing cycles
+      const syncResponse = await fetch('/api/billing-cycles/create-for-all-customers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+        }
+      });
+
+      if (syncResponse.ok) {
+        const syncResult = await syncResponse.json();
+        console.log('Auto-sync result:', syncResult);
+      }
+
+      // Then fetch the billing cycles
       let url = '/api/billing-cycles?';
       const params = new URLSearchParams({
         account_type: cycleAccountType,
@@ -318,45 +322,6 @@ const BillHandlerBilling = () => {
       setCycles([]);
     } finally {
       setCycleLoading(false);
-    }
-  };
-
-  // Generate billing cycles from customers
-  const handleGenerateBillingCycles = async () => {
-    if (!generatePeriod) {
-      alert('Please select a billing period');
-      return;
-    }
-
-    setGenerateLoading(true);
-    try {
-      const response = await fetch('/api/billing-cycles/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-        },
-        body: JSON.stringify({
-          billing_period: generatePeriod,
-          due_days: generateDueDays,
-          overwrite: generateOverwrite
-        })
-      });
-
-      const result = await response.json();
-      
-      if (response.ok && result.success) {
-        alert(`Success! Generated ${result.generated_count} billing cycles for period ${generatePeriod}`);
-        setShowGenerateModal(false);
-        fetchBillingCycles(); // Refresh the list
-      } else {
-        alert(result.message || 'Failed to generate billing cycles');
-      }
-    } catch (err) {
-      console.error('Generate error:', err);
-      alert('Error generating billing cycles. Please try again.');
-    } finally {
-      setGenerateLoading(false);
     }
   };
 
@@ -405,11 +370,11 @@ const BillHandlerBilling = () => {
   });
 
   const filteredCycles = cycles.filter(cycle => {
-    const matchesType = cycleAccountType === 'All' || cycle.accountType === cycleAccountType;
-    const matchesPeriod = cyclePeriod === '' || cycle.billingPeriod === cyclePeriod;
+    const matchesType = cycleAccountType === 'All' || cycle.account_type === cycleAccountType;
+    const matchesPeriod = cyclePeriod === '' || (cycle.billing_start_date && cycle.billing_start_date.slice(0, 7) === cyclePeriod);
     const matchesSearch =
-      cycle.customer.toLowerCase().includes(cycleSearch.toLowerCase()) ||
-      formatAccountNumber(cycle.accountNumber).includes(cycleSearch);
+      (cycle.customer && cycle.customer.toLowerCase().includes(cycleSearch.toLowerCase())) ||
+      (cycle.account_number && formatAccountNumber(cycle.account_number).includes(cycleSearch));
     return matchesType && matchesPeriod && matchesSearch;
   });
 
@@ -498,26 +463,6 @@ const BillHandlerBilling = () => {
   // Count for summary
   const pendingCount = bills.filter(b => b.status === 'Pending Validation').length;
   const unpaidCount = bills.filter(b => b.status === 'Unpaid').length;
-
-  function openCycleModal(cycle) {
-    setSelectedCycle(cycle);
-    setNewCyclePeriod(cycle.billingPeriod);
-    setCycleReason(cycleReasons[0]);
-    setShowCycleModal(true);
-  }
-  function openRemarksModal(cycle) {
-    setSelectedCycle(cycle);
-    setNewRemarks(cycle.remarks || '');
-    setShowRemarksModal(true);
-  }
-  function handleCycleChange() {
-    setCycles(cycles.map(c => c.id === selectedCycle.id ? { ...c, billingPeriod: newCyclePeriod, remarks: (c.remarks ? c.remarks + '\n' : '') + `Cycle changed: ${cycleReason}` } : c));
-    setShowCycleModal(false);
-  }
-  function handleRemarksSave() {
-    setCycles(cycles.map(c => c.id === selectedCycle.id ? { ...c, remarks: newRemarks } : c));
-    setShowRemarksModal(false);
-  }
 
   function openHistoryModal(row) {
     setSelectedHistory(row);
@@ -669,253 +614,130 @@ const BillHandlerBilling = () => {
                   </div>
                 </div>
 
-                {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
-                    <h3 className="font-semibold text-blue-800">Total Readings</h3>
-                    <p className="text-2xl font-bold text-blue-900">{filteredMeterReadings.length}</p>
-                  </div>
-                  <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded">
-                    <h3 className="font-semibold text-green-800">Total Amount</h3>
-                    <p className="text-2xl font-bold text-green-900">
-                      ₱{meterReadings.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-                    <h3 className="font-semibold text-yellow-800">Latest Reading</h3>
-                    <p className="text-2xl font-bold text-yellow-900">
-                      {meterReadings.length > 0 ? formatDate(meterReadings[0]?.reading_date) : '-'}
-                    </p>
-                  </div>
+                {/* Table */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full bg-white">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="py-2 px-4 text-left">ID</th>
+                        <th className="py-2 px-4 text-left">Meter Number</th>
+                        <th className="py-2 px-4 text-left">Reading Value</th>
+                        <th className="py-2 px-4 text-left">Amount</th>
+                        <th className="py-2 px-4 text-left">Remarks</th>
+                        <th className="py-2 px-4 text-left">Staff ID</th>
+                        <th className="py-2 px-4 text-left">Reading Date</th>
+                        <th className="py-2 px-4 text-left">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredMeterReadings.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="py-4 text-center text-gray-500">No meter readings found</td>
+                        </tr>
+                      ) : (
+                        filteredMeterReadings.map(reading => (
+                          <tr key={reading.id} className="border-b">
+                            <td className="py-2 px-4">{reading.id}</td>
+                            <td className="py-2 px-4">{reading.meter_number}</td>
+                            <td className="py-2 px-4">{reading.reading_value}</td>
+                            <td className="py-2 px-4">₱{reading.amount}</td>
+                            <td className="py-2 px-4">{reading.remarks}</td>
+                            <td className="py-2 px-4">{reading.staff_id}</td>
+                            <td className="py-2 px-4">{formatDate(reading.reading_date)}</td>
+                            <td className="py-2 px-4">
+                              <button
+                                onClick={() => openReadingModal(reading)}
+                                className="bg-gray-300 text-gray-800 px-3 py-1 rounded hover:bg-gray-400 text-xs mr-2"
+                              >
+                                View
+                              </button>
+                              <button
+                                onClick={() => handleGenerateInvoice(reading)}
+                                className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-xs"
+                              >
+                                Generate Invoice
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
 
-                {/* Loading */}
-                {readingLoading ? (
-                  <div className="text-center py-10 text-lg font-semibold text-blue-600">Loading meter readings...</div>
-                ) : (
-                  <>
-                    {/* Table */}
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full bg-white">
-                        <thead>
-                          <tr className="bg-gray-50">
-                            <th className="py-2 px-4 text-left">ID</th>
-                            <th className="py-2 px-4 text-left">Meter Number</th>
-                            <th className="py-2 px-4 text-left">Reading Value</th>
-                            <th className="py-2 px-4 text-left">Amount</th>
-                            <th className="py-2 px-4 text-left">Reading Date</th>
-                            <th className="py-2 px-4 text-left">Staff ID</th>
-                            <th className="py-2 px-4 text-left">Remarks</th>
-                            <th className="py-2 px-4 text-left">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredMeterReadings.length === 0 ? (
-                            <tr>
-                              <td colSpan={8} className="py-4 text-center text-gray-500">No meter readings found</td>
-                            </tr>
-                          ) : (
-                            filteredMeterReadings.map(reading => (
-                              <tr key={reading.id} className="border-b">
-                                <td className="py-2 px-4">{reading.id}</td>
-                                <td className="py-2 px-4">{reading.meter_number}</td>
-                                <td className="py-2 px-4">{reading.reading_value}</td>
-                                <td className="py-2 px-4">₱{reading.amount?.toLocaleString()}</td>
-                                <td className="py-2 px-4">{formatDate(reading.reading_date)}</td>
-                                <td className="py-2 px-4">{reading.staff_id || '-'}</td>
-                                <td className="py-2 px-4">
-                                  <div className="max-w-xs truncate" title={reading.remarks || '-'}>
-                                    {reading.remarks || '-'}
-                                  </div>
-                                </td>
-                                <td className="py-2 px-4">
-                                  <div className="flex gap-2">
-                                    <button
-                                      onClick={() => openReadingModal(reading)}
-                                      className="bg-gray-300 text-gray-800 px-3 py-1 rounded hover:bg-gray-400 text-xs"
-                                    >
-                                      View
-                                    </button>
-                                    <button
-                                      onClick={() => handleGenerateInvoice(reading.id)}
-                                      disabled={loadingInvoiceId === reading.id}
-                                      className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-xs disabled:bg-blue-300"
-                                    >
-                                      {loadingInvoiceId === reading.id ? 'Loading...' : 'Generate Invoice'}
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
+                {/* Meter Reading Details Modal */}
+                {showReadingModal && selectedReading && (
+                  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
+                      <h2 className="text-lg font-bold mb-4">Meter Reading Details</h2>
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="mb-2"><b>ID:</b> {selectedReading.id}</div>
+                        <div className="mb-2"><b>Meter Number:</b> {selectedReading.meter_number}</div>
+                        <div className="mb-2"><b>Reading Value:</b> {selectedReading.reading_value}</div>
+                        <div className="mb-2"><b>Amount:</b> ₱{selectedReading.amount}</div>
+                        <div className="mb-2"><b>Reading Date:</b> {formatDate(selectedReading.reading_date)}</div>
+                        <div className="mb-2"><b>Staff ID:</b> {selectedReading.staff_id}</div>
+                        <div className="mb-2"><b>Remarks:</b> {selectedReading.remarks}</div>
+                        <div className="mb-2"><b>Created At:</b> {formatDate(selectedReading.created_at)}</div>
+                      </div>
+                      <div className="flex justify-end gap-2 mt-4">
+                        <button onClick={() => setShowReadingModal(false)} className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400">Close</button>
+                      </div>
                     </div>
+                  </div>
+                )}
 
-                    {/* Meter Reading Details Modal */}
-                    {showReadingModal && selectedReading && (
-                      <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                        <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
-                          <h2 className="text-lg font-bold mb-4">Meter Reading Details</h2>
-                          <div className="grid grid-cols-1 gap-3">
-                            <div className="mb-2"><b>ID:</b> {selectedReading.id}</div>
-                            <div className="mb-2"><b>Meter Number:</b> {selectedReading.meter_number}</div>
-                            <div className="mb-2"><b>Reading Value:</b> {selectedReading.reading_value}</div>
-                            <div className="mb-2"><b>Amount:</b> ₱{selectedReading.amount?.toLocaleString()}</div>
-                            <div className="mb-2"><b>Reading Date:</b> {formatDate(selectedReading.reading_date)}</div>
-                            <div className="mb-2"><b>Staff ID:</b> {selectedReading.staff_id || '-'}</div>
-                            <div className="mb-2"><b>Remarks:</b> <span className="whitespace-pre-line">{selectedReading.remarks || '-'}</span></div>
-                            <div className="mb-2"><b>Created At:</b> {formatDate(selectedReading.created_at)}</div>
+                {/* Generate Invoice Modal */}
+                {showInvoiceModal && selectedReading && (
+                  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                      <div className="bg-blue-600 text-white p-6 text-center">
+                        <h1 className="text-2xl font-bold">HERMOSA WATER DISTRICT</h1>
+                        <h2 className="text-lg">WATER BILL INVOICE</h2>
+                        <div className="mt-2 text-sm">
+                          Invoice #: INV-{selectedReading.id} | Date: {formatDate(new Date())}
+                        </div>
+                      </div>
+                      <div className="p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                          <div>
+                            <h3 className="text-lg font-semibold text-blue-600 mb-3">Meter Reading Information</h3>
+                            <div className="space-y-2">
+                              <div><strong>ID:</strong> {selectedReading.id}</div>
+                              <div><strong>Meter Number:</strong> {selectedReading.meter_number}</div>
+                              <div><strong>Reading Value:</strong> {selectedReading.reading_value}</div>
+                              <div><strong>Amount:</strong> ₱{selectedReading.amount}</div>
+                              <div><strong>Reading Date:</strong> {formatDate(selectedReading.reading_date)}</div>
+                              <div><strong>Staff ID:</strong> {selectedReading.staff_id}</div>
+                            </div>
                           </div>
-                          <div className="flex justify-end gap-2 mt-4">
-                            <button onClick={() => setShowReadingModal(false)} className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400">Close</button>
+                          <div>
+                            <h3 className="text-lg font-semibold text-blue-600 mb-3">Breakdown</h3>
+                            <div className="space-y-2">
+                              <div><strong>Basic Charge:</strong> ₱30.00</div>
+                              <div><strong>Usage Charge:</strong> ₱{selectedReading.amount}</div>
+                              <div><strong>Other Fees:</strong> ₱0.00</div>
+                              <div className="font-bold text-blue-700">Total: ₱{selectedReading.amount}</div>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    )}
-
-                    {/* Invoice Generation Modal */}
-                    {showInvoiceModal && invoiceData && (
-                      <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-                          {/* Invoice Header */}
-                          <div className="bg-blue-600 text-white p-6 text-center">
-                            <h1 className="text-2xl font-bold">HERMOSA WATER DISTRICT</h1>
-                            <h2 className="text-lg">WATER BILL INVOICE</h2>
-                            <div className="mt-2 text-sm">
-                              Invoice #: {generateInvoiceNumber()} | Date: {formatInvoiceDate()}
-                            </div>
-                          </div>
-
-                          {/* Invoice Content */}
-                          <div className="p-6">
-                            {/* Customer & Billing Info */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                              {/* Customer Information */}
-                              <div>
-                                <h3 className="text-lg font-semibold text-blue-600 mb-3">Customer Information</h3>
-                                <div className="space-y-2">
-                                  <div><strong>Name:</strong> {invoiceData.full_name}</div>
-                                  <div><strong>Address:</strong> {invoiceData.address}</div>
-                                  <div><strong>Account #:</strong> {formatAccountNumber(invoiceData.account_number)}</div>
-                                </div>
-                              </div>
-
-                              {/* Billing Period */}
-                              <div>
-                                <h3 className="text-lg font-semibold text-blue-600 mb-3">Billing Period</h3>
-                                <div className="space-y-2">
-                                  <div><strong>From:</strong> {formatInvoiceDate(invoiceData.reading_date)}</div>
-                                  <div><strong>To:</strong> {formatInvoiceDate()}</div>
-                                  <div><strong>Due Date:</strong> <span className="text-red-600">{formatInvoiceDate(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000))}</span></div>
-                                  <div><strong>Rate:</strong> Residential</div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Water Consumption */}
-                            <div className="mb-6">
-                              <h3 className="text-lg font-semibold text-blue-600 mb-3">Water Consumption</h3>
-                              <div className="bg-gray-50 p-4 rounded-lg">
-                                <div className="grid grid-cols-3 gap-4 text-center">
-                                  <div>
-                                    <div className="text-sm text-gray-600">Previous Reading</div>
-                                    <div className="text-2xl font-bold text-blue-600">{invoiceData.reading_value - 23 || 0}</div>
-                                  </div>
-                                  <div>
-                                    <div className="text-sm text-gray-600">Current Reading</div>
-                                    <div className="text-2xl font-bold text-blue-600">{invoiceData.reading_value}</div>
-                                  </div>
-                                  <div>
-                                    <div className="text-sm text-gray-600">Total Usage</div>
-                                    <div className="text-2xl font-bold text-green-600">23 m³</div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Charges Breakdown */}
-                            <div className="mb-6">
-                              <h3 className="text-lg font-semibold text-blue-600 mb-3">Charges Breakdown</h3>
-                              <div className="overflow-x-auto">
-                                <table className="w-full border border-gray-300">
-                                  <thead className="bg-gray-50">
-                                    <tr>
-                                      <th className="border border-gray-300 px-4 py-2 text-left">Description</th>
-                                      <th className="border border-gray-300 px-4 py-2 text-center">Quantity</th>
-                                      <th className="border border-gray-300 px-4 py-2 text-center">Rate</th>
-                                      <th className="border border-gray-300 px-4 py-2 text-right">Amount</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    <tr>
-                                      <td className="border border-gray-300 px-4 py-2">Basic Service Charge</td>
-                                      <td className="border border-gray-300 px-4 py-2 text-center">1 month</td>
-                                      <td className="border border-gray-300 px-4 py-2 text-center">₱185.00</td>
-                                      <td className="border border-gray-300 px-4 py-2 text-right">₱185.00</td>
-                                    </tr>
-                                    <tr>
-                                      <td className="border border-gray-300 px-4 py-2">Water Usage (1-10 m³)</td>
-                                      <td className="border border-gray-300 px-4 py-2 text-center">10 m³</td>
-                                      <td className="border border-gray-300 px-4 py-2 text-center">₱15.50</td>
-                                      <td className="border border-gray-300 px-4 py-2 text-right">₱155.00</td>
-                                    </tr>
-                                    <tr>
-                                      <td className="border border-gray-300 px-4 py-2">Water Usage (11-20 m³)</td>
-                                      <td className="border border-gray-300 px-4 py-2 text-center">10 m³</td>
-                                      <td className="border border-gray-300 px-4 py-2 text-center">₱17.25</td>
-                                      <td className="border border-gray-300 px-4 py-2 text-right">₱172.50</td>
-                                    </tr>
-                                    <tr>
-                                      <td className="border border-gray-300 px-4 py-2">Water Usage (21-30 m³)</td>
-                                      <td className="border border-gray-300 px-4 py-2 text-center">3 m³</td>
-                                      <td className="border border-gray-300 px-4 py-2 text-center">₱19.00</td>
-                                      <td className="border border-gray-300 px-4 py-2 text-right">₱57.00</td>
-                                    </tr>
-                                    <tr>
-                                      <td className="border border-gray-300 px-4 py-2">Environmental Fee</td>
-                                      <td className="border border-gray-300 px-4 py-2 text-center">23 m³</td>
-                                      <td className="border border-gray-300 px-4 py-2 text-center">₱0.50</td>
-                                      <td className="border border-gray-300 px-4 py-2 text-right">₱11.50</td>
-                                    </tr>
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-
-                            {/* Total */}
-                            <div className="text-right mb-6">
-                              <div className="inline-block bg-blue-50 p-4 rounded-lg">
-                                <div className="text-lg"><strong>Subtotal: ₱{invoiceData.amount?.toLocaleString()}</strong></div>
-                                <div className="text-xl font-bold text-blue-600">Total Amount Due: ₱{invoiceData.amount?.toLocaleString()}</div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Modal Actions */}
-                          <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3">
-                            <button 
-                              onClick={() => setShowInvoiceModal(false)} 
-                              className="bg-gray-300 text-gray-800 px-6 py-2 rounded hover:bg-gray-400"
-                            >
-                              Close
-                            </button>
-                            <button 
-                              onClick={() => window.print()} 
-                              className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
-                            >
-                              Print Invoice
-                            </button>
-                            <button 
-                              className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
-                            >
-                              Save Invoice
-                            </button>
-                          </div>
-                        </div>
+                      <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3">
+                        <button 
+                          onClick={() => setShowInvoiceModal(false)} 
+                          className="bg-gray-300 text-gray-800 px-6 py-2 rounded hover:bg-gray-400"
+                        >
+                          Close
+                        </button>
+                        <button 
+                          onClick={() => window.print()} 
+                          className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+                        >
+                          Print Invoice
+                        </button>
                       </div>
-                    )}
-                  </>
+                    </div>
+                  </div>
                 )}
               </div>
             ) : activeTab === 'bill-generation' ? (
@@ -1077,12 +899,9 @@ const BillHandlerBilling = () => {
                 {/* Header with Generate Button */}
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-xl font-semibold">Billing Cycles Management</h2>
-                  <button
-                    onClick={() => setShowGenerateModal(true)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Generate Billing Cycles
-                  </button>
+                  <div className="text-sm text-gray-600">
+                    Billing cycles are automatically synced from customer data
+                  </div>
                 </div>
 
                 {/* Filters */}
@@ -1128,15 +947,15 @@ const BillHandlerBilling = () => {
                     <p className="text-2xl font-bold text-blue-900">{filteredCycles.length}</p>
                   </div>
                   <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded">
-                    <h3 className="font-semibold text-green-800">Paid</h3>
+                    <h3 className="font-semibold text-green-800">Active</h3>
                     <p className="text-2xl font-bold text-green-900">
-                      {cycles.filter(c => c.payment_status === 'Paid').length}
+                      {cycles.filter(c => c.status === 'active').length}
                     </p>
                   </div>
                   <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-                    <h3 className="font-semibold text-yellow-800">Unpaid</h3>
+                    <h3 className="font-semibold text-yellow-800">Inactive</h3>
                     <p className="text-2xl font-bold text-yellow-900">
-                      {cycles.filter(c => c.payment_status === 'Unpaid').length}
+                      {cycles.filter(c => c.status === 'inactive').length}
                     </p>
                   </div>
                   <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
@@ -1157,20 +976,19 @@ const BillHandlerBilling = () => {
                         <tr className="bg-gray-50">
                           <th className="py-2 px-4 text-left">Customer</th>
                           <th className="py-2 px-4 text-left">Account Number</th>
-                          <th className="py-2 px-4 text-left">Current Reading</th>
-                          <th className="py-2 px-4 text-left">Previous Reading</th>
-                          <th className="py-2 px-4 text-left">Consumption</th>
+                          <th className="py-2 px-4 text-left">Account Type</th>
+                          <th className="py-2 px-4 text-left">Billing Start Date</th>
+                          <th className="py-2 px-4 text-left">Billing End Date</th>
+                          <th className="py-2 px-4 text-left">Status</th>
                           <th className="py-2 px-4 text-left">Amount Due</th>
-                          <th className="py-2 px-4 text-left">Due Date</th>
-                          <th className="py-2 px-4 text-left">Payment Status</th>
                           <th className="py-2 px-4 text-left">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {filteredCycles.length === 0 ? (
                           <tr>
-                            <td colSpan={9} className="py-4 text-center text-gray-500">
-                              {cycles.length === 0 ? 'No billing cycles found. Click "Generate Billing Cycles" to create them.' : 'No billing cycles match your filters.'}
+                            <td colSpan={8} className="py-4 text-center text-gray-500">
+                              {cycles.length === 0 ? 'No billing cycles found. Billing cycles are automatically created when you access this tab.' : 'No billing cycles match your filters.'}
                             </td>
                           </tr>
                         ) : (
@@ -1178,27 +996,19 @@ const BillHandlerBilling = () => {
                             <tr key={cycle.id} className="border-b">
                               <td className="py-2 px-4">{cycle.customer}</td>
                               <td className="py-2 px-4">{cycle.account_number}</td>
-                              <td className="py-2 px-4">{cycle.current_reading}</td>
-                              <td className="py-2 px-4">{cycle.previous_reading}</td>
-                              <td className="py-2 px-4">{cycle.consumption || '-'}</td>
-                              <td className="py-2 px-4">₱{parseFloat(cycle.amount_due || 0).toLocaleString()}</td>
-                              <td className="py-2 px-4">{formatDate(cycle.due_date)}</td>
+                              <td className="py-2 px-4">{cycle.account_type}</td>
+                              <td className="py-2 px-4">{formatDate(cycle.billing_start_date)}</td>
+                              <td className="py-2 px-4">{formatDate(cycle.billing_end_date)}</td>
                               <td className="py-2 px-4">
                                 <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                  cycle.payment_status === 'Paid' ? 'bg-green-100 text-green-800' :
-                                  cycle.payment_status === 'Unpaid' ? 'bg-red-100 text-red-800' :
-                                  cycle.payment_status === 'Overdue' ? 'bg-yellow-100 text-yellow-800' :
+                                  cycle.status === 'active' ? 'bg-green-100 text-green-800' :
+                                  cycle.status === 'inactive' ? 'bg-red-100 text-red-800' :
                                   'bg-gray-100 text-gray-800'
-                                }`}>{cycle.payment_status || 'Unpaid'}</span>
+                                }`}>{cycle.status || 'active'}</span>
                               </td>
+                              <td className="py-2 px-4">₱{parseFloat(cycle.amount_due || 0).toLocaleString()}</td>
                               <td className="py-2 px-4">
                                 <div className="flex gap-2">
-                                  <button
-                                    onClick={() => openCycleModal(cycle)}
-                                    className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-xs"
-                                  >
-                                    Edit
-                                  </button>
                                   <button
                                     onClick={() => openCycleDetailsModal(cycle)}
                                     className="bg-gray-300 text-gray-800 px-3 py-1 rounded hover:bg-gray-400 text-xs"
@@ -1224,122 +1034,14 @@ const BillHandlerBilling = () => {
                         <div className="mb-2"><b>Customer:</b> {selectedCycle.customer}</div>
                         <div className="mb-2"><b>Account Number:</b> {selectedCycle.account_number}</div>
                         <div className="mb-2"><b>Account Type:</b> {selectedCycle.account_type}</div>
-                        <div className="mb-2"><b>Billing Period:</b> {selectedCycle.billing_period}</div>
-                        <div className="mb-2"><b>Cycle Date:</b> {formatDate(selectedCycle.cycle_date)}</div>
-                        <div className="mb-2"><b>Meter Reading Date:</b> {formatDate(selectedCycle.meter_reading_date)}</div>
-                        <div className="mb-2"><b>Previous Reading:</b> {selectedCycle.previous_reading}</div>
-                        <div className="mb-2"><b>Current Reading:</b> {selectedCycle.current_reading}</div>
-                        <div className="mb-2"><b>Consumption:</b> {selectedCycle.consumption || '-'} m³</div>
-                        <div className="mb-2"><b>Rate:</b> ₱{parseFloat(selectedCycle.rate || 0).toLocaleString()}/m³</div>
-                        <div className="mb-2"><b>Amount Due:</b> ₱{parseFloat(selectedCycle.amount_due || 0).toLocaleString()}</div>
-                        <div className="mb-2"><b>Total Amount:</b> ₱{parseFloat(selectedCycle.total_amount || 0).toLocaleString()}</div>
-                        <div className="mb-2"><b>Bill Generated:</b> {formatDate(selectedCycle.bill_generated)}</div>
-                        <div className="mb-2"><b>Due Date:</b> {formatDate(selectedCycle.due_date)}</div>
+                        <div className="mb-2"><b>Billing Start Date:</b> {formatDate(selectedCycle.billing_start_date)}</div>
+                        <div className="mb-2"><b>Billing End Date:</b> {formatDate(selectedCycle.billing_end_date)}</div>
                         <div className="mb-2"><b>Status:</b> {selectedCycle.status}</div>
-                        <div className="mb-2"><b>Payment Status:</b> {selectedCycle.payment_status}</div>
+                        <div className="mb-2"><b>Amount Due:</b> ₱{parseFloat(selectedCycle.amount_due || 0).toLocaleString()}</div>
                         <div className="mb-2"><b>Created:</b> {formatDate(selectedCycle.created_at)}</div>
-                        <div className="mb-2"><b>Remarks:</b> <span className="whitespace-pre-line">{selectedCycle.remarks || '-'}</span></div>
                       </div>
                       <div className="flex justify-end gap-2 mt-4">
                         <button onClick={() => setShowCycleDetailsModal(false)} className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400">Close</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Change Cycle Modal */}
-                {showCycleModal && selectedCycle && (
-                  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-                      <h2 className="text-lg font-bold mb-4">Edit Billing Cycle</h2>
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">New Billing Period Date</label>
-                        <input
-                          type="date"
-                          value={newCyclePeriod}
-                          onChange={e => setNewCyclePeriod(e.target.value)}
-                          className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
-                        <select
-                          value={cycleReason}
-                          onChange={e => setCycleReason(e.target.value)}
-                          className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                          {cycleReasons.map(reason => (
-                            <option key={reason} value={reason}>{reason}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <button onClick={() => setShowCycleModal(false)} className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400">Cancel</button>
-                        <button onClick={handleCycleChange} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Generate Billing Cycles Modal */}
-                {showGenerateModal && (
-                  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-                      <h2 className="text-lg font-bold mb-4">Generate Billing Cycles</h2>
-                      <p className="text-gray-600 mb-4">
-                        This will automatically create billing cycles for all customers in your database using their latest meter readings.
-                      </p>
-                      
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Billing Period</label>
-                        <input
-                          type="month"
-                          value={generatePeriod}
-                          onChange={e => setGeneratePeriod(e.target.value)}
-                          className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          required
-                        />
-                      </div>
-                      
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Due Date (Days from now)</label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="90"
-                          value={generateDueDays}
-                          onChange={e => setGenerateDueDays(parseInt(e.target.value))}
-                          className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-                      
-                      <div className="mb-4">
-                        <label className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={generateOverwrite}
-                            onChange={e => setGenerateOverwrite(e.target.checked)}
-                            className="mr-2"
-                          />
-                          <span className="text-sm text-gray-700">Overwrite existing billing cycles for this period</span>
-                        </label>
-                      </div>
-                      
-                      <div className="flex justify-end gap-2">
-                        <button 
-                          onClick={() => setShowGenerateModal(false)} 
-                          className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400"
-                          disabled={generateLoading}
-                        >
-                          Cancel
-                        </button>
-                        <button 
-                          onClick={handleGenerateBillingCycles} 
-                          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
-                          disabled={generateLoading}
-                        >
-                          {generateLoading ? 'Generating...' : 'Generate'}
-                        </button>
                       </div>
                     </div>
                   </div>

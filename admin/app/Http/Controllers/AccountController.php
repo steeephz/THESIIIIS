@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\Customer;
 use App\Models\Staff;
+use App\Services\BillingCycleService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,13 @@ use Illuminate\Support\Facades\Log;
 
 class AccountController extends Controller
 {
+    protected $billingCycleService;
+
+    public function __construct(BillingCycleService $billingCycleService)
+    {
+        $this->billingCycleService = $billingCycleService;
+    }
+
     public function createStaffAccount(Request $request)
     {
         $request->validate([
@@ -427,7 +435,7 @@ class AccountController extends Controller
             $username = substr($username, 0, 50);
 
             // Insert into customers_tb
-            $customer = DB::table('customers_tb')->insertGetId([
+            $customerId = DB::table('customers_tb')->insertGetId([
                 'first_name' => $validated['first_name'],
                 'last_name' => $validated['last_name'],
                 'full_name' => $full_name,
@@ -443,12 +451,21 @@ class AccountController extends Controller
                 'updated_at' => now()
             ]);
 
-            Log::info('New customer created', ['customer_id' => $customer]);
+            Log::info('New customer created', ['customer_id' => $customerId]);
+
+            // Automatically sync billing cycle for the new customer
+            try {
+                $this->billingCycleService->syncBillingCycleForNewCustomer($customerId);
+                Log::info('Billing cycle synced for new customer', ['customer_id' => $customerId]);
+            } catch (\Exception $e) {
+                Log::error('Failed to sync billing cycle for new customer ' . $customerId . ': ' . $e->getMessage());
+                // Don't fail the customer creation if billing cycle sync fails
+            }
 
             return response()->json([
                 'success' => true,
                 'message' => 'Customer created successfully',
-                'data' => ['id' => $customer]
+                'data' => ['id' => $customerId]
             ]);
 
         } catch (\Exception $e) {
@@ -508,6 +525,15 @@ class AccountController extends Controller
                 ]);
             }
 
+            // Automatically update billing cycles for the customer
+            try {
+                $this->billingCycleService->updateBillingCyclesForCustomer($id);
+                Log::info('Billing cycles updated for customer', ['customer_id' => $id]);
+            } catch (\Exception $e) {
+                Log::error('Failed to update billing cycles for customer ' . $id . ': ' . $e->getMessage());
+                // Don't fail the customer update if billing cycle sync fails
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Customer account updated successfully'
@@ -531,6 +557,15 @@ class AccountController extends Controller
                     'success' => false,
                     'message' => 'Customer account not found'
                 ], 404);
+            }
+
+            // Automatically delete billing cycles for the customer
+            try {
+                $this->billingCycleService->deleteBillingCyclesForCustomer($id);
+                Log::info('Billing cycles deleted for customer', ['customer_id' => $id]);
+            } catch (\Exception $e) {
+                Log::error('Failed to delete billing cycles for customer ' . $id . ': ' . $e->getMessage());
+                // Don't fail the customer deletion if billing cycle deletion fails
             }
 
             DB::table('customers_tb')->where('id', $id)->delete();

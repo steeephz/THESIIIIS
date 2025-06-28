@@ -17,8 +17,6 @@ class MeterReadingController extends Controller
     {
         try {
             $accountType = $request->get('accountType', 'All');
-            $page = $request->get('page', 1);
-            $perPage = $request->get('per_page', 10);
 
             // Build the base query
             $query = DB::table('meter_readings')
@@ -42,9 +40,8 @@ class MeterReadingController extends Controller
                 $query->where('customers_tb.account_type', $accountType);
             }
 
-            // Get paginated results
-            $meterReadings = $query->orderBy('meter_readings.created_at', 'desc')
-                ->paginate($perPage);
+            // Get all results (no pagination)
+            $meterReadings = $query->orderBy('meter_readings.created_at', 'desc')->get();
 
             return response()->json([
                 'success' => true,
