@@ -62,6 +62,81 @@ Route::middleware(['web'])->group(function () {
     Route::prefix('bill-handler')->group(function () {
         Route::get('/bill-handler-dashboard', [BillHandlerController::class, 'BillHandlerDashboard']);
         Route::get('/customers', [BillHandlerController::class, 'getCustomers']);
+        Route::get('/profile', [BillHandlerController::class, 'getProfile']);
+        Route::post('/profile/update', [BillHandlerController::class, 'updateProfile']);
+        
+        // Debug route for profile issues
+        Route::get('/debug-profile', function() {
+            try {
+                $user = auth()->user();
+                $debug = [
+                    'authenticated' => auth()->check(),
+                    'user' => $user ? [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email
+                    ] : null,
+                    'session_id' => session()->getId(),
+                    'session_data' => session()->all()
+                ];
+                
+                if ($user) {
+                    $staff = DB::table('staff_tb')
+                        ->where('username', $user->name)
+                        ->first();
+                    
+                    $debug['staff_query'] = [
+                        'searching_for_username' => $user->name,
+                        'staff_found' => $staff ? true : false,
+                        'staff_data' => $staff
+                    ];
+                    
+                    // Also try searching by email
+                    $staffByEmail = DB::table('staff_tb')
+                        ->where('email', $user->email)
+                        ->first();
+                    
+                    $debug['staff_by_email'] = [
+                        'searching_for_email' => $user->email,
+                        'staff_found' => $staffByEmail ? true : false,
+                        'staff_data' => $staffByEmail
+                    ];
+                }
+                
+                return response()->json($debug);
+            } catch (Exception $e) {
+                return response()->json([
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+            }
+        });
+        
+        // Simple database test route
+        Route::get('/test-db', function() {
+            try {
+                // Test basic database connection
+                $test = DB::select('SELECT 1 as test');
+                
+                // Test staff_tb table access
+                $staffCount = DB::table('staff_tb')->count();
+                $sampleStaff = DB::table('staff_tb')->first();
+                
+                return response()->json([
+                    'success' => true,
+                    'database_connected' => true,
+                    'staff_table_accessible' => true,
+                    'staff_count' => $staffCount,
+                    'sample_staff' => $sampleStaff
+                ]);
+            } catch (Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+            }
+        });
     });
 
     // Rate Management Routes

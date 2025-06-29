@@ -26,6 +26,7 @@ class MeterReadingController extends Controller
                     'meter_readings.remarks',
                     'meter_readings.reading_date',
                     'meter_readings.created_at',
+                    'meter_readings.staff_id',
                     'customers_tb.full_name as customer_name',
                     'customers_tb.account_number',
                     'customers_tb.customer_type'
@@ -36,14 +37,25 @@ class MeterReadingController extends Controller
                 $query->where('customers_tb.customer_type', strtolower($request->accountType));
             }
 
-            // Add pagination
-            $perPage = $request->get('per_page', 10);
-            $meterReadings = $query->orderBy('meter_readings.created_at', 'desc')->paginate($perPage);
-
-            return response()->json([
-                'success' => true,
-                'data' => $meterReadings
-            ]);
+            // Check if pagination is requested
+            if ($request->has('per_page') && $request->per_page > 0) {
+                // Return paginated data
+                $perPage = $request->get('per_page', 10);
+                $meterReadings = $query->orderBy('meter_readings.created_at', 'desc')->paginate($perPage);
+                
+                return response()->json([
+                    'success' => true,
+                    'data' => $meterReadings
+                ]);
+            } else {
+                // Return all data without pagination
+                $meterReadings = $query->orderBy('meter_readings.created_at', 'desc')->get();
+                
+                return response()->json([
+                    'success' => true,
+                    'data' => $meterReadings
+                ]);
+            }
         } catch (\Exception $e) {
             \Log::error('Meter readings error: ' . $e->getMessage());
             return response()->json([

@@ -78,6 +78,14 @@ Route::middleware(['web', 'admin.auth'])->prefix('bill-handler')->group(function
         return Inertia::render('BillHandlerDashboard');
     })->name('bill-handler.dashboard');
 
+    Route::get('/profile', function () {
+        return Inertia::render('Profile', [
+            'auth' => [
+                'user' => request()->user(),
+            ],
+        ]);
+    })->name('bill-handler.profile');
+
     Route::get('/tickets', function () {
         return Inertia::render('Tickets');
     })->name('bill-handler.tickets');

@@ -82,4 +82,242 @@ class BillHandlerController extends Controller
             ], 500);
         }
     }
+
+    public function getProfile()
+    {
+        try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                Log::error('User not authenticated in getProfile');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
+
+            Log::info('Getting profile for user:', [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'user_email' => $user->email
+            ]);
+
+            // Try to find staff by username first (most likely match)
+            $staff = DB::table('staff_tb')
+                ->where('username', $user->name)
+                ->first();
+
+            Log::info('Staff lookup by username result:', [
+                'searching_for' => $user->name,
+                'found' => $staff ? true : false,
+                'staff_data' => $staff
+            ]);
+
+            // If not found by username, try by email
+            if (!$staff) {
+                $staff = DB::table('staff_tb')
+                    ->where('email', $user->email)
+                    ->first();
+                
+                Log::info('Staff lookup by email result:', [
+                    'searching_for' => $user->email,
+                    'found' => $staff ? true : false,
+                    'staff_data' => $staff
+                ]);
+            }
+
+            // If still not found, try by name (full name)
+            if (!$staff) {
+                $staff = DB::table('staff_tb')
+                    ->where('name', $user->name)
+                    ->first();
+                
+                Log::info('Staff lookup by name result:', [
+                    'searching_for' => $user->name,
+                    'found' => $staff ? true : false,
+                    'staff_data' => $staff
+                ]);
+            }
+
+            if (!$staff) {
+                Log::error('Staff record not found for user: ' . $user->name . ' (email: ' . $user->email . ')');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Staff record not found'
+                ], 404);
+            }
+
+            Log::info('Staff record found successfully:', [
+                'staff_id' => $staff->id,
+                'staff_name' => $staff->name,
+                'staff_role' => $staff->role
+            ]);
+
+            // Handle profile_picture field - decode JSON if it exists
+            $profilePicture = null;
+            if ($staff->profile_picture) {
+                try {
+                    if (is_string($staff->profile_picture)) {
+                        $decoded = json_decode($staff->profile_picture, true);
+                        if ($decoded && isset($decoded['data'])) {
+                            // Convert buffer data to string
+                            $profilePicture = implode('', array_map('chr', $decoded['data']));
+                        } else {
+                            $profilePicture = $staff->profile_picture;
+                        }
+                    } else {
+                        $profilePicture = $staff->profile_picture;
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Failed to decode profile picture: ' . $e->getMessage());
+                    $profilePicture = null;
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'staff_id' => $staff->id,
+                    'name' => $staff->name,
+                    'address' => $staff->address ?? '',
+                    'contact' => $staff->contact_number ?? '',
+                    'email' => $staff->email ?? '',
+                    'role' => $staff->role,
+                    'profile_picture' => $profilePicture
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Get profile error: ' . $e->getMessage());
+            Log::error('Get profile error trace: ' . $e->getTraceAsString());
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while fetching profile: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function updateProfile(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
+
+            // Try to find staff by username first (most likely match)
+            $staff = DB::table('staff_tb')
+                ->where('username', $user->name)
+                ->first();
+
+            // If not found by username, try by email
+            if (!$staff) {
+                $staff = DB::table('staff_tb')
+                    ->where('email', $user->email)
+                    ->first();
+            }
+
+            // If still not found, try by name (full name)
+            if (!$staff) {
+                $staff = DB::table('staff_tb')
+                    ->where('name', $user->name)
+                    ->first();
+            }
+
+            if (!$staff) {
+                Log::error('Staff record not found for user: ' . $user->name . ' (email: ' . $user->email . ')');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Staff record not found'
+                ], 404);
+            }
+
+            // Validate request
+            $request->validate([
+                'name' => 'required|string|max:255',
+                'address' => 'nullable|string|max:500',
+                'contact' => 'nullable|string|max:20',
+                'email' => 'nullable|email|max:255',
+            ]);
+
+            $updateData = [
+                'name' => $request->name,
+                'address' => $request->address,
+                'contact_number' => $request->contact,
+                'email' => $request->email,
+            ];
+
+            // Handle profile picture upload
+            if ($request->hasFile('profile_picture')) {
+                $file = $request->file('profile_picture');
+                
+                // Validate file
+                $request->validate([
+                    'profile_picture' => 'image|mimes:jpeg,png,jpg,gif|max:2048'
+                ]);
+
+                // Store the file
+                $fileName = time() . '_' . $file->getClientOriginalName();
+                $file->storeAs('public/profile_pictures', $fileName);
+                
+                $updateData['profile_picture'] = '/storage/profile_pictures/' . $fileName;
+            }
+
+            // Update staff record
+            DB::table('staff_tb')
+                ->where('id', $staff->id)
+                ->update($updateData);
+
+            // Get updated staff data
+            $updatedStaff = DB::table('staff_tb')
+                ->where('id', $staff->id)
+                ->first();
+
+            // Handle profile_picture field - decode JSON if it exists
+            $profilePicture = null;
+            if ($updatedStaff->profile_picture) {
+                try {
+                    if (is_string($updatedStaff->profile_picture)) {
+                        $decoded = json_decode($updatedStaff->profile_picture, true);
+                        if ($decoded && isset($decoded['data'])) {
+                            // Convert buffer data to string
+                            $profilePicture = implode('', array_map('chr', $decoded['data']));
+                        } else {
+                            $profilePicture = $updatedStaff->profile_picture;
+                        }
+                    } else {
+                        $profilePicture = $updatedStaff->profile_picture;
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Failed to decode profile picture in update: ' . $e->getMessage());
+                    $profilePicture = null;
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Profile updated successfully',
+                'data' => [
+                    'staff_id' => $updatedStaff->id,
+                    'name' => $updatedStaff->name,
+                    'address' => $updatedStaff->address ?? '',
+                    'contact' => $updatedStaff->contact_number ?? '',
+                    'email' => $updatedStaff->email ?? '',
+                    'role' => $updatedStaff->role,
+                    'profile_picture' => $profilePicture
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Update profile error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while updating profile: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 } 
