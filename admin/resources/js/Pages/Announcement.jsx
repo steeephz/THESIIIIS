@@ -102,36 +102,52 @@ const Announcement = () => {
       // Ensure CSRF token is available
       await axios.get('/sanctum/csrf-cookie');
       
+      const requestData = {
+        title: form.title,
+        content: form.content,
+        start_date: currentDate,
+        end_date: form.end_date
+      };
+
+      console.log('Sending announcement data:', requestData);
+
+      let response;
       if (editingId) {
-        await axios.put(`/api/announcements/${editingId}`, {
-          title: form.title,
-          content: form.content,
-          start_date: currentDate,
-          end_date: form.end_date
-        });
+        response = await axios.put(`/api/announcements/${editingId}`, requestData);
+        console.log('Update response:', response.data);
         showNotification('Announcement updated successfully');
       } else {
-        await axios.post('/api/announcements', {
-          title: form.title,
-          content: form.content,
-          start_date: currentDate,
-          end_date: form.end_date
-        });
+        response = await axios.post('/api/announcements', requestData);
+        console.log('Create response:', response.data);
         showNotification('Announcement created successfully');
       }
+
+      // Check if the response indicates success
+      if (response.data.success === false) {
+        throw new Error(response.data.message || 'Operation failed');
+      }
+
       fetchAnnouncements();
       setForm({ title: '', content: '', end_date: '' });
       setEditingId(null);
       setShowCreateModal(false);
     } catch (error) {
       console.error('Error saving announcement:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
       if (error.response?.status === 401) {
         showNotification('Authentication failed. Please login again.', 'error');
         setTimeout(() => {
           window.location.href = '/';
         }, 2000);
+      } else if (error.response?.status === 422) {
+        // Validation errors
+        const validationErrors = error.response.data.errors;
+        const errorMessages = Object.values(validationErrors).flat().join(', ');
+        showNotification(`Validation error: ${errorMessages}`, 'error');
       } else {
-        showNotification(error.response?.data?.message || 'Failed to save announcement', 'error');
+        showNotification(error.response?.data?.message || error.message || 'Failed to save announcement', 'error');
       }
     }
   };

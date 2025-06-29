@@ -47,20 +47,46 @@ class AnnouncementController extends Controller
         ]);
 
         try {
-            $staff = Auth::user();
-            if (!$staff) {
+            // Get authenticated user
+            $user = Auth::user();
+            
+            // Debug logging
+            \Log::info('Announcement creation attempt', [
+                'user' => $user,
+                'request_data' => $request->all(),
+                'authenticated' => Auth::check()
+            ]);
+
+            if (!$user) {
+                \Log::error('No authenticated user found for announcement creation');
                 return response()->json([
                     'message' => 'Not authenticated as staff.',
                     'success' => false
                 ], 401);
             }
-            if (!isset($staff->id) || !isset($staff->name)) {
+
+            // Try to find staff record by username or email
+            $staff = DB::table('staff_tb')
+                ->where('username', $user->name)
+                ->orWhere('email', $user->email)
+                ->orWhere('name', $user->name)
+                ->first();
+
+            if (!$staff) {
+                \Log::error('Staff record not found for user', [
+                    'user_name' => $user->name,
+                    'user_email' => $user->email
+                ]);
                 return response()->json([
-                    'message' => 'Staff user missing id or name.',
+                    'message' => 'Staff record not found.',
                     'success' => false
-                ], 400);
+                ], 404);
             }
-            DB::table('announcements_tb')->insert([
+
+            \Log::info('Staff record found', ['staff' => $staff]);
+
+            // Insert the announcement
+            $announcementId = DB::table('announcements_tb')->insertGetId([
                 'title' => $request->title,
                 'body' => $request->content,
                 'status' => 'active',
@@ -72,13 +98,22 @@ class AnnouncementController extends Controller
                 'updated_at' => now(),
             ]);
 
+            \Log::info('Announcement created successfully', ['announcement_id' => $announcementId]);
+
             return response()->json([
                 'message' => 'Announcement created successfully',
-                'success' => true
+                'success' => true,
+                'announcement_id' => $announcementId
             ]);
         } catch (\Exception $e) {
+            \Log::error('Failed to create announcement', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all()
+            ]);
+            
             return response()->json([
-                'message' => 'Failed to create announcement',
+                'message' => 'Failed to create announcement: ' . $e->getMessage(),
                 'error' => $e->getMessage(),
                 'success' => false
             ], 500);

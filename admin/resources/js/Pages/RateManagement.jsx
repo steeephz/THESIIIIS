@@ -60,26 +60,43 @@ const RateManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const requestData = editingId !== null ? {
+        minimum_charge: form.minimum_charge,
+        rate_per_cu_m: form.rate_per_cu_m
+      } : {
+        customer_type: customerTypeMap[activeTab],
+        minimum_charge: form.minimum_charge,
+        rate_per_cu_m: form.rate_per_cu_m
+      };
+
+      console.log('Sending rate data:', requestData);
+
       if (editingId !== null) {
-        await axios.put(`/api/rates/${editingId}`, {
-          minimum_charge: form.minimum_charge,
-          rate_per_cu_m: form.rate_per_cu_m
-        });
+        const response = await axios.put(`/api/rates/${editingId}`, requestData);
+        console.log('Update response:', response.data);
         showNotification('Rate updated successfully');
       } else {
-        await axios.post('/api/rates', {
-          customer_type: customerTypeMap[activeTab],
-          minimum_charge: form.minimum_charge,
-          rate_per_cu_m: form.rate_per_cu_m
-        });
+        const response = await axios.post('/api/rates', requestData);
+        console.log('Create response:', response.data);
         showNotification('Rate added successfully');
       }
+      
       fetchRates();
       setForm({ minimum_charge: '', rate_per_cu_m: '' });
       setEditingId(null);
     } catch (error) {
       console.error('Error saving rate:', error);
-      showNotification(error.response?.data?.message || 'Failed to save rate', 'error');
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      if (error.response?.status === 422) {
+        // Validation errors
+        const validationErrors = error.response.data.errors;
+        const errorMessages = Object.values(validationErrors).flat().join(', ');
+        showNotification(`Validation error: ${errorMessages}`, 'error');
+      } else {
+        showNotification(error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to save rate', 'error');
+      }
     }
   };
 
