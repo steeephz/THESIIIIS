@@ -726,22 +726,20 @@ const Reports = () => {
                                 <table className="min-w-full text-sm text-left">
                                     <thead>
                                         <tr className="border-b">
-                                            <th className="py-2 px-4 font-semibold">Meter Reader</th>
                                             <th className="py-2 px-4 font-semibold">Reading Date</th>
-                                                <th className="py-2 px-4 font-semibold">Customer Name</th>
+                                            <th className="py-2 px-4 font-semibold">Customer Name</th>
                                             <th className="py-2 px-4 font-semibold">Account Number</th>
-                                                <th className="py-2 px-4 font-semibold">Meter Number</th>
-                                                <th className="py-2 px-4 font-semibold">Reading Value</th>
-                                                <th className="py-2 px-4 font-semibold">Amount</th>
-                                                <th className="py-2 px-4 font-semibold">Account Type</th>
-                                                <th className="py-2 px-4 font-semibold">Remarks</th>
+                                            <th className="py-2 px-4 font-semibold">Meter Number</th>
+                                            <th className="py-2 px-4 font-semibold">Reading Value</th>
+                                            <th className="py-2 px-4 font-semibold">Amount</th>
+                                            <th className="py-2 px-4 font-semibold">Account Type</th>
+                                            <th className="py-2 px-4 font-semibold">Remarks</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                             {meterReadings.length > 0 ? (
                                                 meterReadings.map((reading) => (
                                                     <tr key={reading.id} className="border-b hover:bg-blue-50">
-                                                        <td className="py-2 px-4">{reading.meter_reader || 'N/A'}</td>
                                                         <td className="py-2 px-4">
                                                             {reading.reading_date ? new Date(reading.reading_date).toLocaleDateString() : 'N/A'}
                                                         </td>
@@ -765,7 +763,7 @@ const Reports = () => {
                                                 ))
                                             ) : (
                                                 <tr>
-                                                    <td colSpan="9" className="py-8 px-4 text-center text-gray-500">
+                                                    <td colSpan="8" className="py-8 px-4 text-center text-gray-500">
                                                         No meter readings found for the selected filters.
                                                     </td>
                                         </tr>
@@ -831,8 +829,6 @@ const Reports = () => {
                                                     <th className="py-2 px-4 font-semibold">Staff</th>
                                                     <th className="py-2 px-4 font-semibold">Published Date</th>
                                                     <th className="py-2 px-4 font-semibold">Expired Date</th>
-                                                    <th className="py-2 px-4 font-semibold">Type</th>
-                                                    <th className="py-2 px-4 font-semibold">Priority</th>
                                                     <th className="py-2 px-4 font-semibold">Created</th>
                                                 </tr>
                                             </thead>
@@ -863,27 +859,13 @@ const Reports = () => {
                                                                 {announcement.expired_at ? new Date(announcement.expired_at).toLocaleDateString() : 'N/A'}
                                                             </td>
                                                             <td className="py-2 px-4">
-                                                                <span className={`px-2 py-1 rounded-full text-xs ${
-                                                                    announcement.type === 'general' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                                                                }`}>
-                                                                    {announcement.type ? announcement.type.charAt(0).toUpperCase() + announcement.type.slice(1) : 'N/A'}
-                                                                </span>
-                                                            </td>
-                                                            <td className="py-2 px-4">
-                                                                <span className={`px-2 py-1 rounded-full text-xs ${
-                                                                    announcement.priority === 1 ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                                                                }`}>
-                                                                    {announcement.priority === 1 ? 'High' : announcement.priority === 2 ? 'Medium' : 'Low'}
-                                                                </span>
-                                                            </td>
-                                                            <td className="py-2 px-4">
                                                                 {announcement.created_at ? new Date(announcement.created_at).toLocaleDateString() : 'N/A'}
                                                             </td>
                                                         </tr>
                                                     ))
                                                 ) : (
                                                     <tr>
-                                                        <td colSpan="11" className="py-8 px-4 text-center text-gray-500">
+                                                        <td colSpan="9" className="py-8 px-4 text-center text-gray-500">
                                                             No announcements found for the selected filters.
                                                         </td>
                                                     </tr>

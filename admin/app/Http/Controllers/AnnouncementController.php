@@ -156,10 +156,7 @@ class AnnouncementController extends Controller
                     'published_at',
                     'expired_at',
                     'created_at',
-                    'updated_at',
-                    'duration',
-                    'type',
-                    'priority'
+                    'updated_at'
                 ]);
 
             // Filter by status if provided

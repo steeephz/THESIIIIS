@@ -16,12 +16,9 @@ class MeterReadingController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $accountType = $request->get('accountType', 'All');
-
-            // Build the base query
             $query = DB::table('meter_readings')
-                ->leftJoin('customers_tb', 'meter_readings.meter_number', '=', 'customers_tb.meter_number')
-                ->select(
+                ->join('customers_tb', 'meter_readings.meter_number', '=', 'customers_tb.meter_number')
+                ->select([
                     'meter_readings.id',
                     'meter_readings.meter_number',
                     'meter_readings.reading_value',
@@ -29,19 +26,19 @@ class MeterReadingController extends Controller
                     'meter_readings.remarks',
                     'meter_readings.reading_date',
                     'meter_readings.created_at',
-                    'meter_readings.staff_id',
                     'customers_tb.full_name as customer_name',
                     'customers_tb.account_number',
-                    'customers_tb.account_type'
-                );
+                    'customers_tb.customer_type'
+                ]);
 
-            // Apply account type filter if specified
-            if ($accountType !== 'All') {
-                $query->where('customers_tb.account_type', $accountType);
+            // Filter by account type if provided
+            if ($request->has('accountType') && $request->accountType !== 'All') {
+                $query->where('customers_tb.customer_type', strtolower($request->accountType));
             }
 
-            // Get all results (no pagination)
-            $meterReadings = $query->orderBy('meter_readings.created_at', 'desc')->get();
+            // Add pagination
+            $perPage = $request->get('per_page', 10);
+            $meterReadings = $query->orderBy('meter_readings.created_at', 'desc')->paginate($perPage);
 
             return response()->json([
                 'success' => true,
@@ -152,54 +149,33 @@ class MeterReadingController extends Controller
     public function getWithCustomer($id): JsonResponse
     {
         try {
-            \Log::info('Getting meter reading with customer for ID: ' . $id);
-            
-            // First check if meter reading exists
+            // Get the meter reading
             $meterReading = DB::table('meter_readings')->where('id', $id)->first();
-            
             if (!$meterReading) {
-                \Log::error('Meter reading not found for ID: ' . $id);
-                return response()->json(['error' => 'Meter reading not found'], 404);
+                return response()->json(['success' => false, 'message' => 'Meter reading not found'], 404);
             }
-
-            \Log::info('Meter reading found: ' . json_encode($meterReading));
-
-            // Check if customer exists with this meter number
-            $customer = DB::table('customers_tb')->where('meter_number', $meterReading->meter_number)->first();
-            
-            if (!$customer) {
-                \Log::error('No customer found with meter_number: ' . $meterReading->meter_number);
-                return response()->json([
-                    'error' => 'No customer found with meter number: ' . $meterReading->meter_number,
-                    'meter_reading' => $meterReading
-                ], 404);
-            }
-
-            // Perform the join
-            $result = DB::table('meter_readings')
-                ->join('customers_tb', 'meter_readings.meter_number', '=', 'customers_tb.meter_number')
-                ->where('meter_readings.id', $id)
-                ->select(
-                    'meter_readings.*',
-                    'customers_tb.full_name',
-                    'customers_tb.address',
-                    'customers_tb.account_number'
-                )
+            // Use LIKE to match meter_number in customers_tb for robustness
+            $customer = DB::table('customers_tb')
+                ->where('meter_number', 'LIKE', '%' . $meterReading->meter_number . '%')
                 ->first();
-
-            if (!$result) {
-                \Log::error('Join failed for meter reading ID: ' . $id . ' with meter_number: ' . $meterReading->meter_number);
-                return response()->json(['error' => 'Failed to join customer data'], 500);
+            if (!$customer) {
+                return response()->json(['success' => false, 'message' => 'Customer not found for this meter number'], 404);
             }
-
-            \Log::info('Successfully retrieved meter reading with customer data');
-            return response()->json($result);
+            // Combine data
+            $result = [
+                'meter_reading' => $meterReading,
+                'customer' => [
+                    'full_name' => $customer->full_name,
+                    'address' => $customer->address,
+                    'account_number' => $customer->account_number,
+                    'contact_number' => $customer->contact_number,
+                    'customer_type' => $customer->customer_type,
+                ]
+            ];
+            return response()->json(['success' => true, 'data' => $result]);
         } catch (\Exception $e) {
             \Log::error('Get meter reading with customer error: ' . $e->getMessage());
-            \Log::error('Stack trace: ' . $e->getTraceAsString());
-            return response()->json([
-                'error' => 'Failed to retrieve data: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['success' => false, 'message' => 'Failed to fetch meter reading with customer']);
         }
     }
 } 
